@@ -12,6 +12,9 @@
 #include <memory>
 
 #include <SDL3/SDL_messagebox.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 #include <cxxopts.hpp>
 
 #ifdef _WIN32
@@ -223,6 +226,20 @@ int main(int argc, char* argv[]) noexcept
 		{
 			return EXIT_FAILURE;
 		}
+#ifdef __EMSCRIPTEN__
+		// Emscripten owns the animation frame scheduling. Keep Game alive until
+		// the user quits or the frame loop terminates.
+		emscripten_set_main_loop_arg(
+		    [](void* context) {
+			    auto* runningGame = static_cast<openblack::Game*>(context);
+			    if (!runningGame->Frame())
+			    {
+				    emscripten_cancel_main_loop();
+				    delete runningGame;
+			    }
+		    },
+		    game.release(), 0, 1);
+#endif
 	}
 	catch (std::exception& e)
 	{
