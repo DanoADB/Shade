@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shade — Browser Engine</title><style>
+:root{color-scheme:dark;font:16px system-ui;background:#101b20;color:#eaf1ee}body{max-width:680px;margin:12vh auto;padding:24px}main{background:#182a30;padding:32px;border:1px solid #536568;border-radius:16px}h1{font-size:3em;letter-spacing:.15em;margin:0}p{line-height:1.55}a{color:#abd7cb}small{color:#aebcbd}
+</style></head><body><main><h1>SHADE</h1><p>The Creator. The creature. The believers.</p>
+<p id="status" role="status">Checking engine build...</p><p><small>This is a deployment readiness page, not a game preview. An executable browser build has not yet been validated.</small></p>
+<a href="https://github.com/DanoADB/Shade/tree/shade-development">Source repository</a></main>
+<script>(async()=>{const p=document.getElementById("status");try{const r=await fetch("/healthz");if(!r.ok)throw Error("HTTP "+r.status);const x=await r.json();if(x.engine_artifact_present){p.textContent="Engine entry point present (runtime unverified). ";const a=document.createElement("a");a.href="/openblack.html";a.textContent="Open engine";p.append(a)}else p.textContent="Web host operational. Engine compilation still pending."}catch(e){p.textContent="Host diagnostics unavailable: "+e.message}})()</script>
+</body></html>
