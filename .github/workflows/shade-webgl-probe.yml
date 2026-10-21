@@ -1,0 +1,31 @@
+name: Shade C++ WebGL2 probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [shade-development]
+    paths:
+      - 'web/engine-probe/**'
+      - '.github/workflows/shade-webgl-probe.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '4.0.15'
+      - name: Compile WebGL2 probe
+        run: bash web/engine-probe/build.sh
+      - name: Verify generated browser files
+        run: |
+          test -s web/dist/engine-probe/index.html
+          test -s web/dist/engine-probe/probe.js
+          test -s web/dist/engine-probe/probe.wasm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shade-webgl2-probe
+          path: web/dist/engine-probe/
+          if-no-files-found: error
