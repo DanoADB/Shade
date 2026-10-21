@@ -1,0 +1,49 @@
+name: Shade hosting smoke test
+
+on:
+  push:
+    branches: [shade-development]
+    paths:
+      - 'web/**'
+      - '.github/workflows/shade-web-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Python syntax
+        run: python3 -m py_compile web/serve.py
+      - name: Start host
+        run: |
+          PORT=8765 python3 web/serve.py > /tmp/shade-host.log 2>&1 &
+          echo $! > /tmp/shade-host.pid
+      - name: Verify readiness and headers
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          import urllib.request
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:8765/healthz') as response:
+                      data = json.load(response)
+                      assert data['service'] == 'shade-web'
+                      assert data['engine_artifact_present'] is False
+                      assert response.headers['Cross-Origin-Opener-Policy'] == 'same-origin'
+                      assert response.headers['Cross-Origin-Embedder-Policy'] == 'require-corp'
+                  with urllib.request.urlopen('http://127.0.0.1:8765/') as response:
+                      assert b'SHADE' in response.read()
+                  with urllib.request.urlopen('http://127.0.0.1:8765/prototype.js') as response:
+                      assert b'Creature' in response.read() or b'creature' in response.read()
+                  break
+              except OSError:
+                  time.sleep(0.25)
+          else:
+              raise SystemExit('Shade hosting smoke test failed')
+          print('Shade host verified')
+          PY
