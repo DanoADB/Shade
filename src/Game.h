@@ -82,6 +82,7 @@ public:
 	bool Update() noexcept;
 	bool Initialize() noexcept;
 	bool Run() noexcept;
+	bool Frame() noexcept;
 
 	bool LoadMap(const std::filesystem::path& path) noexcept;
 	void LoadLandscape(const std::filesystem::path& path);
@@ -111,6 +112,7 @@ private:
 	std::chrono::steady_clock::duration _turnDeltaTime;
 	float _gameSpeedMultiplier {1.0f};
 	uint32_t _frameCount {0};
+	std::chrono::high_resolution_clock::time_point _renderStartTime {};
 	uint32_t _turnCount {0};
 	bool _paused {true};
 	bool _leftMouseButtonDown {false};
