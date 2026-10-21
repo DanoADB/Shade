@@ -832,10 +832,24 @@ bool Game::Run() noexcept
 	Locator::time::value().Start();
 
 	_frameCount = 0;
-	auto lastTime = std::chrono::high_resolution_clock::now();
-	auto& profiler = Locator::profiler::value();
-	while (Update())
+	_renderStartTime = std::chrono::high_resolution_clock::now();
+#ifndef __EMSCRIPTEN__
+	while (Frame()) {}
+#endif
+	return true;
+}
+
+bool Game::Frame() noexcept
+{
+	if (!Update())
 	{
+		return false;
+	}
+	auto& config = Locator::config::value();
+	auto& profiler = Locator::profiler::value();
+	auto duration = std::chrono::high_resolution_clock::now() - _renderStartTime;
+	auto milliseconds = std::chrono::duration_cast<std::chrono::duration<uint32_t, std::milli>>(duration);
+
 		auto duration = std::chrono::high_resolution_clock::now() - lastTime;
 		auto milliseconds = std::chrono::duration_cast<std::chrono::duration<uint32_t, std::milli>>(duration);
 		{
@@ -875,8 +889,6 @@ bool Game::Run() noexcept
 		}
 
 		_frameCount++;
-	}
-
 	return true;
 }
 
