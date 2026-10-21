@@ -246,18 +246,17 @@ else ()
   endif ()
 
   if (EMSCRIPTEN)
-    # Must be run from project root using `emrun --no_browser --serve_after_close --serve_after_exit .`
-    # Browser should point to http://localhost:6931/emscripten-vcpkg/bin/Debug/openblack.html?-g&relative/path/to/game/files
+    # SDL3 is resolved through vcpkg and linked to openblack_lib above.
+    # Do not request Emscripten's SDL2 port (USE_SDL=2): SDL2 and SDL3
+    # symbols/types are incompatible. This enables a compiler probe, but
+    # SDL_GPU still needs a dedicated browser renderer.
     set_target_properties(
       openblack
       PROPERTIES
         COMPILE_FLAGS_DEBUG "-g3 -gsource-map"
         LINK_FLAGS_DEBUG "-g3 -gsource-map"
-        COMPILE_FLAGS "-s USE_SDL=2 -fexceptions"
-        #COMPILE_FLAGS "-s USE_SDL=2 -s USE_PTHREADS=1"
-        LINK_FLAGS
-        "-s USE_SDL=2 -s FULL_ES3=1 -s GL_ASSERTIONS=1 -s USE_WEBGL2=1 -s TOTAL_MEMORY=128MB -fexceptions --emrun"
-        #LINK_FLAGS "-s USE_SDL=2 -s FULL_ES3=1 -s GL_ASSERTIONS=1 -s USE_WEBGL2=1 -s USE_PTHREADS=1 -s TOTAL_MEMORY=128MB --emrun"
+        COMPILE_FLAGS "-fexceptions"
+        LINK_FLAGS "-s ALLOW_MEMORY_GROWTH=1 -fexceptions --emrun"
         SUFFIX ".html"
     )
   elseif (APPLE)
