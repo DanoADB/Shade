@@ -850,8 +850,6 @@ bool Game::Frame() noexcept
 	auto duration = std::chrono::high_resolution_clock::now() - _renderStartTime;
 	auto milliseconds = std::chrono::duration_cast<std::chrono::duration<uint32_t, std::milli>>(duration);
 
-		auto duration = std::chrono::high_resolution_clock::now() - lastTime;
-		auto milliseconds = std::chrono::duration_cast<std::chrono::duration<uint32_t, std::milli>>(duration);
 		{
 			auto section = profiler.BeginScoped(Profiler::Stage::SceneDraw);
 
