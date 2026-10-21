@@ -1,0 +1,83 @@
+name: Shade WebAssembly build probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [shade-development]
+    paths:
+      - '.github/workflows/shade-web.yml'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'src/**'
+      - 'components/**'
+      - 'externals/**'
+      - 'vcpkg.json'
+  pull_request:
+    paths:
+      - '.github/workflows/shade-web.yml'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'src/**'
+
+permissions:
+  contents: read
+
+jobs:
+  wasm-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: lukka/get-cmake@latest
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkg-config autoconf autoconf-archive automake libtool
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '4.0.15'
+          actions-cache-folder: emsdk-cache
+      - name: Report tools
+        shell: bash
+        run: |
+          emcc --version
+          cmake --version
+          ninja --version
+          echo "EMSDK=${EMSDK}"
+      - name: Bootstrap bundled vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Configure Emscripten preset
+        id: configure
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --preset emscripten-vcpkg -DOPENBLACK_WARNINGS_AS_ERRORS=OFF 2>&1 | tee shade-wasm-configure.log
+      - name: Build WebAssembly target
+        if: steps.configure.outcome == 'success'
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --build --preset emscripten-vcpkg-release --target openblack --parallel 2 2>&1 | tee shade-wasm-build.log
+      - name: Examine generated outputs
+        if: success()
+        run: |
+          find cmake-build-presets/emscripten-vcpkg -type f \( -name '*.html' -o -name '*.js' -o -name '*.wasm' \) -print
+          test -f cmake-build-presets/emscripten-vcpkg/bin/Release/openblack.html
+      - name: Upload logs and any web outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shade-web-probe-${{ github.run_number }}
+          if-no-files-found: warn
+          path: |
+            shade-wasm-configure.log
+            shade-wasm-build.log
+            cmake-build-presets/emscripten-vcpkg/bin/Release/*.html
+            cmake-build-presets/emscripten-vcpkg/bin/Release/*.js
+            cmake-build-presets/emscripten-vcpkg/bin/Release/*.wasm
