@@ -12,7 +12,11 @@
 #define LOCATOR_IMPLEMENTATIONS
 
 #include "RendererNoOp.h"
+#ifdef __EMSCRIPTEN__
+#include "RendererWebGl.h"
+#else
 #include "RendererSdl3Gpu.h"
+#endif
 
 using namespace openblack::graphics;
 
@@ -22,5 +26,10 @@ std::unique_ptr<RendererInterface> RendererInterface::Create(GraphicsBackend bac
 	{
 		return std::make_unique<RendererNoOp>();
 	}
+	#ifdef __EMSCRIPTEN__
+	(void)vsync;
+	return RendererWebGl::Create();
+#else
 	return RendererSdl3Gpu::Create(vsync);
+#endif
 }

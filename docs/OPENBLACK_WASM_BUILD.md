@@ -51,3 +51,11 @@ Logs: .local/wasm-configure.log (first dependency failure), .local/wasm-build.lo
 ## Next implementation
 
 Implement a browser rendering backend behind the engine's rendering/resource interfaces. Validate one engine-controlled terrain pass before adding sky, meshes/skinning, vegetation, water/reflections and debug UI. Retain the native renderer as the visual reference. A successful procedural or JS rendering demo is not acceptance for an engine pass. Then add a local browser asset mount and test the same original island against the native baseline.
+
+## WebGL2 backend checkpoint (2026-10-22)
+
+The Emscripten build now selects `RendererWebGl`, rather than attempting an SDL GPU Vulkan device. It creates a WebGL2 context, compiles and links a diagnostic terrain program, and uploads engine LandBlock vertex buffers. The main render pass uses the engine camera and terrain block positions. Other resource types retain metadata only; entities, original materials, reflections, water, sprites and the debug UI are not rendered yet. Native builds retain the SDL GPU backend.
+
+Verification: full WASM Release build succeeded; Node `--help` succeeded. A fresh browser URL with matching JS/WASM files initialized SDL, EnTT, the WebGL2 renderer and OpenAL, then reported `Failed to find the GameDir` because `/game` was not mounted. This confirms renderer initialization, not terrain drawing or playable gameplay. A stale JS file paired with a newly linked WASM file produced a callable-import mismatch; testing a fresh versioned directory resolved it.
+
+Next: add a local asset import/virtual filesystem mount for the prepared original game directory, boot Land1, then verify camera movement and actual terrain output before implementing original terrain materials and model rendering. Do not publish original game assets in Git or in a hosted build.

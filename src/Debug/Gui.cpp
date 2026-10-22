@@ -53,6 +53,17 @@ using namespace openblack::debug::gui;
 
 std::unique_ptr<DebugGuiInterface> DebugGuiInterface::Create() noexcept
 {
+#ifdef __EMSCRIPTEN__
+    // The SDL GPU debug UI cannot use a WebGL device. Keep input available to the engine.
+    class BrowserGui final : public DebugGuiInterface {
+        bool StealsFocus() const noexcept override { return false; }
+        void SetScale(float) noexcept override {}
+        bool ProcessEvents(const SDL_Event&) noexcept override { return false; }
+        bool Loop() noexcept override { return false; }
+        void Draw(SDL_GPUCommandBuffer*, SDL_GPUTexture*) noexcept override {}
+    };
+    return std::make_unique<BrowserGui>();
+#endif
 	IMGUI_CHECKVERSION();
 	auto* imgui = ImGui::CreateContext();
 
