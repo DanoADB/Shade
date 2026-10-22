@@ -19,4 +19,3 @@ function frame(){if(stopped)return;const d=Math.min(devicePixelRatio,2),w=Math.r
  for(const m of meshes){gl.uniform1f(actorUniform,m.actor?1:0);gl.uniform1f(yawUniform,heading);gl.uniform3f(offsetUniform,state?(state.creature.x-310)*.025:0,0,state?(state.creature.y-290)*.025:0);gl.bindVertexArray(m.vao);gl.bindTexture(gl.TEXTURE_2D,m.texture);gl.drawElements(gl.TRIANGLES,m.count,gl.UNSIGNED_SHORT,0);}requestAnimationFrame(frame);}
 frame();return {triangles,stop(){stopped=true;}};
 }
-

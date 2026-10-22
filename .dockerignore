@@ -1,0 +1,24 @@
+# Keep the Railway image build focused on the browser frontend.
+.git
+.github
+.vscode
+cmake-build-presets
+build
+vcpkg
+externals
+test
+apps
+assets
+components
+src
+CMakeModules
+*.log
+*.zip
+*.tar
+*.7z
+web/dist/engine-probe
+
+# Local SDKs, original disk assets and derived private previews
+.local
+**/__pycache__
+*.pyc

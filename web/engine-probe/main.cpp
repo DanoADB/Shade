@@ -3,10 +3,14 @@
 #include <GLES3/gl3.h>
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include <sstream>
+#include <string>
+#include <limits>
 
 namespace {
 GLuint program = 0, vao = 0, vertices = 0;
@@ -14,6 +18,8 @@ GLint position = -1, color = -1, transform = -1;
 float angle = 0.45f, zoom = 9.0f, pitch = 0.65f;
 bool held[512] {};
 double previous = 0.0;
+GLsizei vertexCount = 0;
+
 
 const char* vertexSource = R"(#version 300 es
 precision highp float;
@@ -57,6 +63,19 @@ void push(std::vector<V>& data,float x,float z) {
     const float height=std::fmax(0.f,y);
     data.push_back({x,y,z,0.16f+0.28f*height,0.37f+0.22f*height,0.22f+0.12f*height});
 }
+void upload(const std::vector<V>& data) {
+    if (data.empty()) return;
+    if (!vao) glGenVertexArrays(1,&vao);
+    glBindVertexArray(vao);
+    if (!vertices) glGenBuffers(1,&vertices);
+    glBindBuffer(GL_ARRAY_BUFFER,vertices);
+    glBufferData(GL_ARRAY_BUFFER,data.size()*sizeof(V),data.data(),GL_STATIC_DRAW);
+    glEnableVertexAttribArray(position);
+    glVertexAttribPointer(position,3,GL_FLOAT,GL_FALSE,sizeof(V),(void*)0);
+    glEnableVertexAttribArray(color);
+    glVertexAttribPointer(color,3,GL_FLOAT,GL_FALSE,sizeof(V),(void*)(3*sizeof(float)));
+    vertexCount=static_cast<GLsizei>(data.size());
+}
 void geometry() {
     std::vector<V> data;
     constexpr int grid=96;
@@ -67,15 +86,7 @@ void geometry() {
         push(data,x0,z0);push(data,x1,z0);push(data,x0,z1);
         push(data,x0,z1);push(data,x1,z0);push(data,x1,z1);
     }
-    glGenVertexArrays(1,&vao);
-    glBindVertexArray(vao);
-    glGenBuffers(1,&vertices);
-    glBindBuffer(GL_ARRAY_BUFFER,vertices);
-    glBufferData(GL_ARRAY_BUFFER,data.size()*sizeof(V),data.data(),GL_STATIC_DRAW);
-    glEnableVertexAttribArray(position);
-    glVertexAttribPointer(position,3,GL_FLOAT,GL_FALSE,sizeof(V),(void*)0);
-    glEnableVertexAttribArray(color);
-    glVertexAttribPointer(color,3,GL_FLOAT,GL_FALSE,sizeof(V),(void*)(3*sizeof(float)));
+    upload(data);
 }
 float matrix[16];
 void render() {
@@ -113,7 +124,7 @@ void render() {
     glUseProgram(program);
     glUniformMatrix4fv(transform,1,GL_FALSE,matrix);
     glBindVertexArray(vao);
-    glDrawArrays(GL_TRIANGLES,0,96*96*6);
+    glDrawArrays(GL_TRIANGLES,0,vertexCount);
 }
 EM_BOOL key(int type,const EmscriptenKeyboardEvent* event,void*) {
     const int code=(int)event->keyCode;
@@ -128,6 +139,37 @@ EM_BOOL wheel(int,const EmscriptenWheelEvent* event,void*) {
     zoom=std::fmax(5.0f,std::fmin(18.0f,zoom+(float)event->deltaY*0.01f));
     return EM_TRUE;
 }
+}
+// Called from the file input. Each triangle is three lines of XYZ RGB vertices.
+// This mesh is derived locally from authorized data and is never uploaded.
+extern "C" EMSCRIPTEN_KEEPALIVE int shade_load_mesh(const char* text, int length) {
+    if (!text || length <= 0 || length > 100000000) return -1;
+    std::istringstream input(std::string(text,static_cast<size_t>(length)));
+    std::string marker;
+    if (!(input >> marker) || marker != "SHADE_MESH_V1") return -2;
+    std::vector<V> data;
+    V v{};
+    float minx=std::numeric_limits<float>::max(), maxx=-minx;
+    float minz=minx,maxz=-minx,miny=minx,maxy=-minx;
+    while(input >> v.x >> v.y >> v.z >> v.r >> v.g >> v.b) {
+        if (!std::isfinite(v.x)||!std::isfinite(v.y)||!std::isfinite(v.z)||
+            !std::isfinite(v.r)||!std::isfinite(v.g)||!std::isfinite(v.b)) return -3;
+        minx=std::min(minx,v.x);maxx=std::max(maxx,v.x);
+        miny=std::min(miny,v.y);maxy=std::max(maxy,v.y);
+        minz=std::min(minz,v.z);maxz=std::max(maxz,v.z);
+        data.push_back(v);
+        if(data.size()>1800000) return -4;
+    }
+    if(data.empty() || data.size()%3!=0 || !input.eof()) return -5;
+    const float scale=10.f/std::max(0.001f,std::max(maxx-minx,maxz-minz));
+    for(auto& p:data) {
+        p.x=(p.x-(minx+maxx)*0.5f)*scale;
+        p.y=(p.y-(miny+maxy)*0.5f)*scale;
+        p.z=(p.z-(minz+maxz)*0.5f)*scale;
+    }
+    upload(data);
+    zoom=12.f;
+    return static_cast<int>(data.size()/3);
 }
 int main() {
     EmscriptenWebGLContextAttributes attributes;

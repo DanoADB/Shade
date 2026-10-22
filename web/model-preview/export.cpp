@@ -28,4 +28,3 @@ int main(int argc,char** argv){
  }}
  std::ofstream stream(argv[2]);stream<<out;std::cout<<out["primitives"].size()<<" primitives, "<<out["textures"].size()<<" textures\n";return stream?0:6;
 }
-
