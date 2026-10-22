@@ -264,10 +264,12 @@ int WINAPI WinMain([[maybe_unused]] HINSTANCE hInstance, [[maybe_unused]] HINSTA
 #include <emscripten/emscripten.h>
 #include "Camera/Camera.h"
 #include "Locator.h"
-extern "C" EMSCRIPTEN_KEEPALIVE int shade_village_view()
+extern "C" EMSCRIPTEN_KEEPALIVE int shade_village_view(int closeup)
 {
     if (!openblack::Locator::camera::has_value()) return 0;
-    openblack::Locator::camera::value().SetFocus({1920.0f,48.0f,2700.0f}).SetOrigin({2120.0f,450.0f,2400.0f});
+    auto& camera=openblack::Locator::camera::value();
+    camera.SetFocus({1920.0f,48.0f,2700.0f});
+    camera.SetOrigin(closeup ? glm::vec3(1960.0f,110.0f,2600.0f) : glm::vec3(2120.0f,450.0f,2400.0f));
     return 1;
 }
 #endif

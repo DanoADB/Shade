@@ -201,6 +201,13 @@ void main() {
         glDepthMask(GL_TRUE);glDisable(GL_BLEND);
         glBindVertexArray(0);
         if (!_modelsReported) {
+            if(meshes.Contains(std::string("hand"))) {
+                const auto hand=meshes.Handle(resources::HashIdentifier(std::string("hand")));
+                size_t uploadedSkins=0;
+                for(const auto& [id,skin]:hand->GetSkins()) if(skin && skin->handle.id)++uploadedSkins;
+                emscripten_log(EM_LOG_CONSOLE,"Original god hand: %s, %zu bones, %zu/%zu original skins uploaded",
+                    hand->GetDebugName().c_str(),hand->GetBoneMatrices().size(),uploadedSkins,hand->GetSkins().size());
+            }
             emscripten_log(EM_LOG_CONSOLE,"Model batches: %zu entities, %zu trees; GL error 0x%x",
                 context.instancedDrawDescs.size(),context.treeInstancedDrawDescs.size(),glGetError());
             _modelsReported=true;

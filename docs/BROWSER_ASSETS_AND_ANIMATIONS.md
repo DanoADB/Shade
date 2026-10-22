@@ -44,3 +44,8 @@ The development launcher provides **Village view**, which moves the engine camer
 Validation: full WASM Release build, native regression build, and deterministic decoder fixtures for BC1 opaque red, punch-through transparency, cropped edge output, BC2 explicit alpha and BC3 alpha. Reproduce the fixture with the local Emscripten compiler using `-std=c++23 -Isrc -I.local/wasm-build/vcpkg_installed/wasm32-emscripten/include tools/shade/test_texture_decode.cpp -o .local/test-texture-decode.js`, then run it with the local SDK Node executable.
 
 Limits: models use rest-pose bones, capped at 64 bones per mesh; animation playback is not implemented. Terrain morphing for buildings, tree sway, water/reflections, sky rendering, bump/footprint materials, complete texture-format coverage, draw-call optimization and gameplay interaction still need work. Existing upstream script gaps remain. This is the full engine rendering its own original scene, but it is not a playable vertical slice yet.
+
+
+### Original art sources
+
+The browser scene uses the original game art supplied locally: the god hand is `Data/CreatureMesh/Hand_Boned_Base2.l3d` (169 triangles, 22 bones, one embedded skin); village buildings, villagers, fields and tree models come from `Data/AllMeshes.g3d` and its packed textures; the island materials come from `Data/Landscape/Land1.lnd`. The engine updates the hand entity through its existing terrain raycast/input path. `Village close-up` is a closer development camera for inspecting these assets. Rest-pose rendering does not yet reproduce the original game's animated gestures or complete lighting.

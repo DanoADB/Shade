@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Shade engine development</title>
 <style>body{margin:0;background:#151b20;color:#edf2e7;font:16px system-ui}header{padding:16px}canvas{width:100%;height:70vh;display:block}textarea{width:100%;height:18vh;background:#101419;color:#bde0bb}button{padding:8px}#status{margin-left:16px}</style></head>
-<body><header><b>Shade · original engine development</b> <button id="load">Load local game files</button><button id="village" disabled>Village view</button><span id="status">Select your prepared game folder to start.</span><input id="folder" type="file" webkitdirectory multiple hidden></header>
+<body><header><b>Shade · original engine development</b> <button id="load">Load local game files</button><button id="village" disabled>Village view</button><button id="closeup" disabled>Village close-up</button><span id="status">Select your prepared game folder to start.</span><input id="folder" type="file" webkitdirectory multiple hidden></header>
 <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas><textarea id="output" readonly aria-label="Engine log"></textarea>
 <script>
 var Module = {
@@ -9,7 +9,7 @@ var Module = {
  arguments: ['-g','/game','--start-level','Land1.txt','-l','stdout'],
  print: line => { const log=document.getElementById('output'); log.value+=line+'\n';log.scrollTop=log.scrollHeight; },
  printErr: line => Module.print(line),
- setStatus: text => { if(text) document.getElementById('status').textContent=text; if(text==='Running...') document.getElementById('village').disabled=false; },
+ setStatus: text => { if(text) document.getElementById('status').textContent=text; if(text==='Running...'){document.getElementById('village').disabled=false;document.getElementById('closeup').disabled=false;} },
  onAbort: reason => Module.setStatus('Engine stopped: '+reason),
  onExit: code => Module.setStatus('Engine exited ('+code+'). See log below.'),
  preRun: [function() {
@@ -49,7 +49,8 @@ var Module = {
 };
 window.addEventListener('error', event=>Module.setStatus('Engine error: '+event.message));
 window.addEventListener('unhandledrejection', event=>Module.setStatus('Engine error: '+String(event.reason)));
-document.getElementById('village').onclick=()=>{if(Module._shade_village_view)Module._shade_village_view();Module.canvas.focus();};
+document.getElementById('village').onclick=()=>{if(Module._shade_village_view)Module._shade_village_view(0);Module.canvas.focus();};
+document.getElementById('closeup').onclick=()=>{if(Module._shade_village_view)Module._shade_village_view(1);Module.canvas.focus();};
 Module.canvas.width=1280;Module.canvas.height=720;
 </script>
 {{{ SCRIPT }}}
