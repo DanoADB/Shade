@@ -246,6 +246,7 @@ else ()
   endif ()
 
   if (EMSCRIPTEN)
+    configure_file("${CMAKE_SOURCE_DIR}/web/mobile-controls.js" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/mobile-controls.js" COPYONLY)
     # SDL3 is resolved through vcpkg and linked to openblack_lib above.
     # Do not request Emscripten's SDL2 port (USE_SDL=2): SDL2 and SDL3
     # symbols/types are incompatible. This enables a compiler probe, but

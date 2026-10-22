@@ -14,6 +14,7 @@
 #include <SDL3/SDL_messagebox.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
+#include <SDL3/SDL.h>
 #endif
 #include <cxxopts.hpp>
 
@@ -271,5 +272,35 @@ extern "C" EMSCRIPTEN_KEEPALIVE int shade_village_view(int closeup)
     camera.SetFocus({1920.0f,48.0f,2700.0f});
     camera.SetOrigin(closeup ? glm::vec3(1960.0f,110.0f,2600.0f) : glm::vec3(2120.0f,450.0f,2400.0f));
     return 1;
+}
+
+#include "Windowing/WindowingInterface.h"
+extern "C" EMSCRIPTEN_KEEPALIVE int shade_control(int action, int pressed)
+{
+    if (!openblack::Locator::gameActionSystem::has_value()) return 0;
+    static constexpr SDL_Scancode keys[] = {SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT, SDL_SCANCODE_UP, SDL_SCANCODE_DOWN,
+                                            SDL_SCANCODE_Z, SDL_SCANCODE_U, SDL_SCANCODE_A, SDL_SCANCODE_Q};
+    SDL_Event event {};
+    if (action >= 0 && action < 8)
+    {
+        event.type = pressed ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+        event.key.scancode = keys[action];
+        event.key.key = SDL_GetKeyFromScancode(keys[action], SDL_KMOD_NONE, false);
+        event.key.down = pressed != 0;
+    }
+    else if ((action == 8 || action == 9) && pressed)
+    {
+        event.type = SDL_EVENT_MOUSE_WHEEL;
+        event.wheel.y = action == 8 ? 1.0f : -1.0f;
+    }
+    else return 0;
+    return SDL_PushEvent(&event) ? 1 : 0;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE int shade_resize(int width, int height)
+{
+    if (!openblack::Locator::windowing::has_value() || width < 1 || height < 1 || width > 4096 || height > 4096) return 0;
+    auto& window = openblack::Locator::windowing::value();
+    if (window.GetSize() == glm::ivec2(width, height)) return 1;
+    return SDL_SetWindowSize(static_cast<SDL_Window*>(window.GetHandle()), width, height) ? 1 : 0;
 }
 #endif

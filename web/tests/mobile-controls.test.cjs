@@ -1,0 +1,17 @@
+const assert = require('node:assert/strict');
+const {createHoldController} = require('../mobile-controls.js');
+const events=[], timers=new Map(); let next=0;
+const clock={setInterval(fn){timers.set(++next,fn);return next},clearInterval(id){timers.delete(id)}};
+const held=createHoldController((action,down)=>events.push([action,down]),clock);
+held.start(1,0);held.start(2,0);held.stop(1);
+assert.deepEqual(events,[[0,1]],'Second finger must keep a shared direction held');
+held.stop(2);assert.deepEqual(events,[[0,1],[0,0]]);
+held.stop(2);assert.equal(events.length,2,'Duplicate cancellation must be harmless');
+held.start(3,8);assert.equal(timers.size,1);
+for(const fn of timers.values())fn();
+assert.deepEqual(events.slice(-2),[[8,1],[8,1]]);
+held.start(4,2);held.reset();
+assert.equal(timers.size,0,'Focus loss/cancellation must stop repeating zoom');
+assert.deepEqual(events.at(-1),[2,0],'Reset must release held movement');
+held.start('key-4',4);held.reset();assert.deepEqual(events.slice(-2),[[4,1],[4,0]]);
+console.log('Mobile hold, multi-pointer release, repeated zoom, cancellation and keyboard cleanup passed.');

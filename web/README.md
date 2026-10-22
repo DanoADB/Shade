@@ -17,3 +17,10 @@ After the deployment commit is pushed, verify the live health manifest, `/model-
 The Docker executable is unavailable on the current development machine, so the container build has not been tested here. The same Python static host and packaged files have been tested locally, including a successful browser folder import reproducing the original hand/village/tree scene. The existing GitHub `shade-web.yml` workflow is a separate source compilation experiment; it is not the artifact source for this package.
 
 The engine currently renders original terrain materials and rest-pose models. Animated playback, water, complete interaction and a playable vertical slice remain in progress.
+
+
+## Touch controls
+
+The full-engine launcher has an on-screen movement pad, zoom, rotation and tilt controls. Touch controls appear automatically for coarse-pointer devices and can be toggled on desktop. The existing engine handles canvas dragging, pinch zoom and tapping to point the hand. Controls release on pointer cancellation, focus loss and hidden tabs; multiple fingers on the same action do not release it prematurely. Canvas/window sizes follow viewport and orientation changes, with a maximum rendering edge of 1280 pixels. Details are collapsed to keep the game visible, and supported browsers offer fullscreen.
+
+Verification: WASM and native builds, `node web/tests/mobile-controls.test.cjs`, and browser checks at 390×844 and 844×390. Holding movement and zoom controls changed the engine camera without browser errors; both layouts fit without horizontal scrolling. Physical Android/iOS devices and native multitouch gestures have not yet been tested. The large current game pack and memory footprint remain a limitation for phones.
