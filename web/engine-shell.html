@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Shade engine development</title>
+<style>body{margin:0;background:#151b20;color:#edf2e7;font:16px system-ui}header{padding:16px}canvas{width:100%;height:70vh;display:block}textarea{width:100%;height:18vh;background:#101419;color:#bde0bb}button{padding:8px}#status{margin-left:16px}</style></head>
+<body><header><b>Shade · original engine development</b> <button id="load">Load local game files</button><span id="status">Select your prepared game folder to start.</span><input id="folder" type="file" webkitdirectory multiple hidden></header>
+<canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas><textarea id="output" readonly aria-label="Engine log"></textarea>
+<script>
+var Module = {
+ canvas: document.getElementById('canvas'),
+ arguments: ['-g','/game','--start-level','Land1.txt','-l','stdout'],
+ print: line => { const log=document.getElementById('output'); log.value+=line+'\n';log.scrollTop=log.scrollHeight; },
+ printErr: line => Module.print(line),
+ setStatus: text => { if(text) document.getElementById('status').textContent=text; },
+ onAbort: reason => Module.setStatus('Engine stopped: '+reason),
+ onExit: code => Module.setStatus('Engine exited ('+code+'). See log below.'),
+ preRun: [function() {
+  Module.addRunDependency('original-assets');
+  const button=document.getElementById('load'),folder=document.getElementById('folder');
+  function safePath(path) {
+   const parts=path.split('/');
+   if(parts.some(p=>!p||p==='.'||p==='..'||p.includes('\\'))) throw Error('Invalid asset path');
+   return '/game/'+parts.join('/');
+  }
+  async function install(entries) {
+   button.disabled=true;
+   try {
+    Module.FS.mkdirTree('/game');
+    let count=0;
+    for(const entry of entries) {
+     const path=safePath(entry.path);
+     Module.FS.mkdirTree(path.slice(0,path.lastIndexOf('/')));
+     Module.FS.writeFile(path,new Uint8Array(await entry.read()));
+     Module.setStatus('Loading game files '+(++count)+' / '+entries.length);
+    }
+    for(const path of ['Scripts/Land1.txt','Scripts/info.dat','Data/AllMeshes.g3d','Data/AllAnims.anm'])
+     if(!Module.FS.analyzePath('/game/'+path).exists) throw Error('Missing '+path+'; select the prepared Data/Scripts/Audio folder.');
+    for(const path of ['Scripts/Playgrounds','Scripts/Quests','Scripts/CreatureMind']) Module.FS.mkdirTree('/game/'+path);
+    Module.setStatus('Starting original engine…');
+    Module.removeRunDependency('original-assets');
+   } catch(error) { Module.printErr(String(error));Module.setStatus('Asset import failed: '+error.message);button.disabled=false; }
+  }
+  button.onclick=()=>folder.click();
+  folder.onchange=()=>install(Array.from(folder.files,f=>({path:f.webkitRelativePath.split('/').slice(1).join('/'),read:()=>f.arrayBuffer()})));
+  if(new URLSearchParams(location.search).has('local')) {
+   fetch('/local-assets/manifest').then(r=>{if(!r.ok)throw Error('Local asset host unavailable');return r.json();})
+    .then(manifest=>install(manifest.files.map(path=>({path,read:async()=>{const r=await fetch('/local-assets/file/'+path.split('/').map(encodeURIComponent).join('/'));if(!r.ok)throw Error('Missing '+path);return r.arrayBuffer();}}))))
+    .catch(error=>Module.setStatus(error.message));
+  }
+ }]
+};
+window.addEventListener('error', event=>Module.setStatus('Engine error: '+event.message));
+window.addEventListener('unhandledrejection', event=>Module.setStatus('Engine error: '+String(event.reason)));
+Module.canvas.width=1280;Module.canvas.height=720;
+</script>
+{{{ SCRIPT }}}
+</body></html>

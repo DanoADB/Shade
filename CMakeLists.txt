@@ -34,6 +34,12 @@ endif ()
 
 project(openblack VERSION 0.1.0)
 
+if (EMSCRIPTEN)
+  # Catching asset/parser errors must work inside engine and component libraries,
+  # not only in the executable's main translation unit.
+  add_compile_options(-fexceptions)
+endif ()
+
 # Configure C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

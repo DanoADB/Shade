@@ -256,7 +256,8 @@ else ()
         COMPILE_FLAGS_DEBUG "-g3 -gsource-map"
         LINK_FLAGS_DEBUG "-g3 -gsource-map"
         COMPILE_FLAGS "-fexceptions"
-        LINK_FLAGS "-s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=4194304 -fexceptions --emrun"
+        LINK_DEPENDS "${CMAKE_SOURCE_DIR}/web/engine-shell.html"
+        LINK_FLAGS "-s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=4194304 -fexceptions -s EXPORTED_RUNTIME_METHODS=FS,addRunDependency,removeRunDependency --shell-file=\"${CMAKE_SOURCE_DIR}/web/engine-shell.html\""
         SUFFIX ".html"
     )
   elseif (APPLE)

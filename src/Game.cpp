@@ -610,6 +610,8 @@ bool Game::Initialize() noexcept
 		animationManager.Load(i, resources::L3DAnimLoader::FromBufferTag {}, animations[i]);
 	}
 
+	SPDLOG_LOGGER_INFO(spdlog::get("game"), "Original asset packs loaded: {} meshes, {} animations", meshes.size(), animations.size());
+
 	fileSystem.Iterate(fileSystem.GetPath<Path::CreatureMesh>(), false, [&meshManager](const std::filesystem::path& f) {
 		const auto& fileName = f.stem().string();
 		SPDLOG_LOGGER_DEBUG(spdlog::get("game"), "Loading creature mesh: {}", fileName);
