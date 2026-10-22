@@ -6,7 +6,7 @@ Build with `./tools/shade/wasm.ps1 -Action Build`, then run from the repository 
 
     python tools/shade/serve_engine.py
 
-Open http://localhost:8082/openblack.html?local=1 to load the prepared `.local/native-game-data` folder. The development host binds only to loopback, exposes an exact asset inventory, and disables caching to avoid mismatched JS/WASM builds. It does not change the source files. The ordinary launcher without `?local=1` offers a folder picker for a prepared Data/Scripts/Audio directory. That picker implementation still needs a separate end-to-end verification; the local HTTP import is verified.
+Open http://localhost:8082/openblack.html?local=1 to load the prepared `.local/native-game-data` folder. The development host binds only to loopback, exposes an exact asset inventory, and disables caching to avoid mismatched JS/WASM builds. It does not change the source files. The ordinary launcher without `?local=1` offers a folder picker for a prepared Data/Scripts/Audio directory. The picker path and local HTTP import have both been verified end to end. The packaged static-host build reproduced the hand/village/tree scene using only the browser folder picker.
 
 Assets are copied into browser memory for this first pass (718 files / 433,736,829 bytes in the tested inventory), so this is a desktop development workflow. Streaming, selective level loading and memory profiling are still required before a broad online release. Original assets are not checked into Git. The hosting package should contain engine code; users can supply local assets through the picker.
 
