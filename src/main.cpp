@@ -258,3 +258,16 @@ int WINAPI WinMain([[maybe_unused]] HINSTANCE hInstance, [[maybe_unused]] HINSTA
 	return main(__argc, __argv);
 }
 #endif
+
+// Development navigation for checking the engine's loaded original scene.
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#include "Camera/Camera.h"
+#include "Locator.h"
+extern "C" EMSCRIPTEN_KEEPALIVE int shade_village_view()
+{
+    if (!openblack::Locator::camera::has_value()) return 0;
+    openblack::Locator::camera::value().SetFocus({1920.0f,48.0f,2700.0f}).SetOrigin({2120.0f,450.0f,2400.0f});
+    return 1;
+}
+#endif

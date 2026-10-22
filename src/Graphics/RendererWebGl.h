@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "RendererInterface.h"
+#include "BlockTextureDecode.h"
 #include <GLES3/gl3.h>
 #include <emscripten/html5.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -23,6 +24,10 @@
 #include "Camera/Camera.h"
 #include "Graphics/Mesh.h"
 #include "Locator.h"
+#include "3D/L3DMesh.h"
+#include "3D/L3DSubMesh.h"
+#include "ECS/Systems/RenderingSystemInterface.h"
+#include "Resources/ResourcesInterface.h"
 
 #if !defined(LOCATOR_IMPLEMENTATIONS)
 #error "Locator interface implementations should only be included in Locator.cpp, use interface instead."
@@ -31,7 +36,7 @@
 namespace openblack::graphics
 {
 
-// First browser pass: engine terrain geometry with diagnostic shading. Other resources retain metadata only.
+// Browser terrain and rest-pose scene models. Water, terrain morphing, and animation playback remain pending.
 class RendererWebGl final: public RendererInterface
 {
 public:
@@ -49,45 +54,92 @@ public:
         const char* vertex = R"(#version 300 es
 layout(location=0) in vec3 position;
 layout(location=1) in vec4 light;
+layout(location=2) in vec3 weight;
+layout(location=3) in uvec3 firstMaterial;
+layout(location=4) in uvec3 secondMaterial;
+layout(location=5) in vec3 materialBlend;
+layout(location=6) in float waterAlpha;
 uniform mat4 viewProjection;
 uniform vec2 offset;
-out vec3 color;
+out vec2 uv;
+out vec3 weights;
+flat out uvec3 first;
+flat out uvec3 second;
+out vec3 blend;
+out float lighting;
+out float alpha;
 void main() {
     vec3 world = position + vec3(offset.x, 0.0, offset.y);
     gl_Position = viewProjection * vec4(world, 1.0);
-    color = mix(vec3(0.18,0.33,0.12),vec3(0.55,0.48,0.32),clamp(world.y/160.0,0.0,1.0)) * (0.35+0.65*light.r);
+    uv = position.zx / 160.0;
+    weights=weight; first=firstMaterial; second=secondMaterial;
+    blend=materialBlend;lighting=light.r;alpha=waterAlpha;
 })";
         const char* fragment = R"(#version 300 es
 precision highp float;
-in vec3 color;
+precision highp sampler2DArray;
+in vec2 uv;
+in vec3 weights;
+flat in uvec3 first;
+flat in uvec3 second;
+in vec3 blend;
+in float lighting;
+in float alpha;
+uniform sampler2DArray materials;
 out vec4 outputColor;
-void main() { outputColor = vec4(color,1.0); }
+void main() {
+    if(alpha == 0.0) discard;
+    vec3 color=vec3(0.0);
+    for(int i=0;i<3;++i) {
+        vec3 a=texture(materials,vec3(uv,float(first[i]))).rgb;
+        vec3 b=texture(materials,vec3(uv,float(second[i]))).rgb;
+        color+=mix(a,b,blend[i])*weights[i];
+    }
+    outputColor=vec4(color*clamp(lighting*2.0,0.5,1.0),1.0);
+}
 )";
-        GLuint shaders[2] = {glCreateShader(GL_VERTEX_SHADER), glCreateShader(GL_FRAGMENT_SHADER)};
-        const char* sources[2] = {vertex, fragment};
-        renderer->_program = glCreateProgram();
-        for (int i=0;i<2;++i) {
-            glShaderSource(shaders[i],1,&sources[i],nullptr);
-            glCompileShader(shaders[i]);
-            GLint compiled=0; glGetShaderiv(shaders[i],GL_COMPILE_STATUS,&compiled);
-            if (!compiled) {
-                char log[2048]; glGetShaderInfoLog(shaders[i],sizeof(log),nullptr,log);
-                emscripten_log(EM_LOG_ERROR,"Terrain shader: %s",log);
-                for (auto shader : shaders) glDeleteShader(shader);
-                return nullptr;
-            }
-            glAttachShader(renderer->_program,shaders[i]);
-        }
-        glLinkProgram(renderer->_program);
-        for (auto shader : shaders) glDeleteShader(shader);
-        GLint linked=0; glGetProgramiv(renderer->_program,GL_LINK_STATUS,&linked);
-        if (!linked) return nullptr;
+        renderer->_program=CompileProgram(vertex,fragment);
+        const char* objectVertex=R"(#version 300 es
+layout(location=0) in vec3 position;
+layout(location=1) in vec2 texcoord;
+layout(location=2) in vec3 normal;
+layout(location=3) in ivec2 joint;
+uniform mat4 viewProjection;
+uniform mat4 model;
+uniform mat4 bones[64];
+uniform int boneCount;
+out vec2 uv;
+out float shade;
+void main() {
+    mat4 bone=mat4(1.0);
+    if(joint.x>=0 && joint.x<boneCount) bone=bones[joint.x];
+    gl_Position=viewProjection*model*bone*vec4(position,1.0);
+    vec3 n=normalize(mat3(model*bone)*normal);
+    shade=0.5+0.5*max(dot(n,normalize(vec3(0.4,0.8,0.3))),0.0);
+    uv=texcoord;
+})";
+        const char* objectFragment=R"(#version 300 es
+precision highp float;
+in vec2 uv;
+in float shade;
+uniform sampler2D diffuse;
+uniform bool textured;
+uniform float alphaCutoff;
+out vec4 outputColor;
+void main() {
+    vec4 color=textured ? texture(diffuse,uv) : vec4(0.7,0.65,0.5,1.0);
+    if(color.a<alphaCutoff) discard;
+    outputColor=vec4(color.rgb*shade,color.a);
+})";
+        renderer->_objectProgram=CompileProgram(objectVertex,objectFragment);
+        if (!renderer->_program || !renderer->_objectProgram) return nullptr;
         glGenVertexArrays(1,&renderer->_vao);
-        emscripten_log(EM_LOG_CONSOLE,"Shade WebGL2 terrain renderer initialized (materials/entities pending)");
+        emscripten_log(EM_LOG_CONSOLE,"Shade WebGL2 terrain renderer initialized (original materials; rest-pose models)");
         return renderer;
     }
     ~RendererWebGl() noexcept override {
         if (_program) glDeleteProgram(_program);
+        if (_objectProgram) glDeleteProgram(_objectProgram);
         if (_vao) glDeleteVertexArrays(1,&_vao);
         if (_context > 0) emscripten_webgl_destroy_context(_context);
     }
@@ -96,25 +148,63 @@ void main() { outputColor = vec4(color,1.0); }
         if (desc.viewId != RenderPass::Main || !desc.camera) return;
         int width=0,height=0;
         emscripten_get_canvas_element_size("#canvas",&width,&height);
+        if (!_reported) emscripten_log(EM_LOG_CONSOLE,"Upload GL error: 0x%x",glGetError());
         glViewport(0,0,width,height);
         glClearColor(0.45f,0.65f,0.85f,1.0f);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        if (!desc.drawIsland || !Locator::terrainSystem::has_value()) return;
+        if (!Locator::terrainSystem::has_value()) return;
         glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDisable(GL_CULL_FACE);
         glUseProgram(_program); glBindVertexArray(_vao);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D_ARRAY,static_cast<GLuint>(Locator::terrainSystem::value().GetAlbedoArray().handle.id));
+        glUniform1i(glGetUniformLocation(_program,"materials"),0);
+        if (!_reported) {
+            const auto origin=desc.camera->GetOrigin(); const auto focus=desc.camera->GetFocus();
+            emscripten_log(EM_LOG_CONSOLE,"Terrain: %zu blocks, vertex size %zu, camera %.2f %.2f %.2f -> %.2f %.2f %.2f",
+                Locator::terrainSystem::value().GetBlocks().size(),sizeof(LandVertex),origin.x,origin.y,origin.z,focus.x,focus.y,focus.z);
+            _reported=true;
+        }
         const auto matrix=desc.camera->GetViewProjectionMatrix(Camera::Projection::Normal);
         glUniformMatrix4fv(glGetUniformLocation(_program,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
-        for (const auto& block: Locator::terrainSystem::value().GetBlocks()) {
+        if(desc.drawIsland) for (const auto& block: Locator::terrainSystem::value().GetBlocks()) {
             const auto& buffer=block.GetMesh().GetVertexBuffer();
             if (!buffer.handle.id) continue;
             glBindBuffer(GL_ARRAY_BUFFER,static_cast<GLuint>(buffer.handle.id));
             glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,buffer.strideBytes,nullptr);
             glEnableVertexAttribArray(1); glVertexAttribPointer(1,4,GL_UNSIGNED_BYTE,GL_TRUE,buffer.strideBytes,reinterpret_cast<void*>(36));
+            glEnableVertexAttribArray(2); glVertexAttribPointer(2,3,GL_FLOAT,GL_FALSE,buffer.strideBytes,reinterpret_cast<void*>(12));
+            glEnableVertexAttribArray(3); glVertexAttribIPointer(3,3,GL_UNSIGNED_BYTE,buffer.strideBytes,reinterpret_cast<void*>(24));
+            glEnableVertexAttribArray(4); glVertexAttribIPointer(4,3,GL_UNSIGNED_BYTE,buffer.strideBytes,reinterpret_cast<void*>(28));
+            glEnableVertexAttribArray(5); glVertexAttribPointer(5,3,GL_UNSIGNED_BYTE,GL_TRUE,buffer.strideBytes,reinterpret_cast<void*>(32));
+            glEnableVertexAttribArray(6); glVertexAttribPointer(6,1,GL_FLOAT,GL_FALSE,buffer.strideBytes,reinterpret_cast<void*>(40));
             const auto offset=block.GetMapPosition();
             glUniform2f(glGetUniformLocation(_program,"offset"),offset.x,offset.y);
             glDrawArrays(GL_TRIANGLES,0,buffer.vertexCount);
         }
+        if (!_modelsReported) emscripten_log(EM_LOG_CONSOLE,"Terrain GL error: 0x%x",glGetError());
+        glUseProgram(_objectProgram);
+        glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
+        const auto& context=Locator::rendereringSystem::value().GetContext();
+        const auto& meshes=Locator::resources::value().GetMeshes();
+        if (desc.drawEntities) for(const auto& [key,instances]:context.instancedDrawDescs) {
+            if(!meshes.Contains(key.meshId)) continue;
+            const auto mesh=meshes.Handle(key.meshId);
+            for(uint32_t i=0;i<instances.count;++i)
+                DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i));
+        }
+        if(desc.drawVegetation) for(const auto& [id,instances]:context.treeInstancedDrawDescs) {
+            if(!meshes.Contains(id)) continue;
+            const auto mesh=meshes.Handle(id);
+            for(uint32_t i=0;i<instances.count;++i)
+                DrawObject(*mesh,context.treeInstanceData.at(instances.offset+i).modelMatrix);
+        }
+        glDepthMask(GL_TRUE);glDisable(GL_BLEND);
         glBindVertexArray(0);
+        if (!_modelsReported) {
+            emscripten_log(EM_LOG_CONSOLE,"Model batches: %zu entities, %zu trees; GL error 0x%x",
+                context.instancedDrawDescs.size(),context.treeInstancedDrawDescs.size(),glGetError());
+            _modelsReported=true;
+        }
     }
 	void Frame() noexcept final {}
 	void RequestScreenshot(const std::filesystem::path&) noexcept final {}
@@ -144,7 +234,7 @@ void main() { outputColor = vec4(color,1.0); }
 			return nullptr;
 		}
         GLuint handle=0;
-        if (name == "LandBlock") {
+        {
             glGenBuffers(1,&handle);
             glBindBuffer(GL_ARRAY_BUFFER,handle);
             glBufferData(GL_ARRAY_BUFFER,memory.size_bytes(),memory.data(),GL_STATIC_DRAW);
@@ -161,15 +251,68 @@ void main() { outputColor = vec4(color,1.0); }
 		{
 			return nullptr;
 		}
-		return {new (std::nothrow) IndexBuffer {std::move(name), static_cast<uint32_t>(memory.size_bytes() / stride), type, {}},
-		        [](IndexBuffer* buffer) { delete buffer; }};
+        GLuint handle=0; glGenBuffers(1,&handle);
+        // WebGL distinguishes index buffers from vertex buffers at first bind.
+        // Preserve the draw VAO while creating this element buffer.
+        GLint previousVao=0;glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&previousVao);
+        glBindVertexArray(0);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,handle);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,memory.size(),memory.data(),GL_STATIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);glBindVertexArray(previousVao);
+        return {new (std::nothrow) IndexBuffer {std::move(name),static_cast<uint32_t>(memory.size()/stride),type,{handle}},
+                [](IndexBuffer* buffer) { const auto id=static_cast<GLuint>(buffer->handle.id);glDeleteBuffers(1,&id);delete buffer; }};
 	}
 
-	[[nodiscard]] Texture2dUniquePtr CreateTexture2d(std::string name, std::span<const uint8_t>, glm::u16vec2 resolution,
-	                                                 uint16_t layers, TextureFormat format, Wrapping, Filter) noexcept final
+	[[nodiscard]] Texture2dUniquePtr CreateTexture2d(std::string name, std::span<const uint8_t> memory, glm::u16vec2 resolution,
+	                                                 uint16_t layers, TextureFormat format, Wrapping wrapping, Filter filter) noexcept final
 	{
-		return {new (std::nothrow) Texture2d {std::move(name), {}, {}, resolution, layers, format},
-		        [](Texture2d* texture) { delete texture; }};
+		GLuint handle=0;
+        if (format == TextureFormat::BGR5A1 && layers > 1) {
+            const size_t count=static_cast<size_t>(resolution.x)*resolution.y*layers;
+            if (memory.size() < count*2) return nullptr;
+            std::vector<uint8_t> rgba(count*4);
+            for (size_t i=0;i<count;++i) {
+                const uint16_t pixel=memory[i*2] | (uint16_t(memory[i*2+1])<<8);
+                rgba[i*4]=((pixel>>10)&31)*255/31;
+                rgba[i*4+1]=((pixel>>5)&31)*255/31;
+                rgba[i*4+2]=(pixel&31)*255/31;
+                rgba[i*4+3]=255;
+            }
+            glGenTextures(1,&handle); glBindTexture(GL_TEXTURE_2D_ARRAY,handle);
+            glTexImage3D(GL_TEXTURE_2D_ARRAY,0,GL_RGBA8,resolution.x,resolution.y,layers,0,GL_RGBA,GL_UNSIGNED_BYTE,rgba.data());
+            glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        }
+        else if(layers == 1 && !memory.empty()) {
+            const size_t count=static_cast<size_t>(resolution.x)*resolution.y;
+            std::vector<uint8_t> rgba;
+            if(format==TextureFormat::BlockCompression1 || format==TextureFormat::BlockCompression2 || format==TextureFormat::BlockCompression3) {
+                const size_t needed=((resolution.x+3)/4)*((resolution.y+3)/4)*(format==TextureFormat::BlockCompression1 ? 8 : 16);
+                if(memory.size()<needed) return nullptr;
+                rgba=detail::DecodeBlockCompressed(format,memory,resolution.x,resolution.y,1);
+            } else if(format==TextureFormat::BGRA4 && memory.size()>=count*2) {
+                rgba.resize(count*4);
+                for(size_t i=0;i<count;++i) {
+                    const uint16_t pixel=memory[i*2]|(uint16_t(memory[i*2+1])<<8);
+                    rgba[i*4]=((pixel>>8)&15)*17;rgba[i*4+1]=((pixel>>4)&15)*17;
+                    rgba[i*4+2]=(pixel&15)*17;rgba[i*4+3]=(pixel>>12)*17;
+                }
+            } else if((format==TextureFormat::RGBA8 || format==TextureFormat::BGRA8) && memory.size()>=count*4) {
+                rgba.assign(memory.begin(),memory.begin()+count*4);
+                if(format==TextureFormat::BGRA8)for(size_t i=0;i<count;++i)std::swap(rgba[i*4],rgba[i*4+2]);
+            }
+            if(!rgba.empty()) {
+                glGenTextures(1,&handle);glBindTexture(GL_TEXTURE_2D,handle);
+                glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,resolution.x,resolution.y,0,GL_RGBA,GL_UNSIGNED_BYTE,rgba.data());
+                const GLint sampling=filter==Filter::Linear ? GL_LINEAR : GL_NEAREST;
+                const GLint address=wrapping==Wrapping::Repeat ? GL_REPEAT : wrapping==Wrapping::MirroredRepeat ? GL_MIRRORED_REPEAT : GL_CLAMP_TO_EDGE;
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,sampling);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,sampling);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,address);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,address);
+            }
+        }
+        return {new (std::nothrow) Texture2d {std::move(name), {handle}, {}, resolution, layers, format},
+                [](Texture2d* texture) { const auto id=static_cast<GLuint>(texture->handle.id); if(id)glDeleteTextures(1,&id); delete texture; }};
 	}
 
 	[[nodiscard]] std::unique_ptr<FrameBuffer> CreateFrameBuffer(std::string name, glm::u16vec2 resolution,
@@ -181,8 +324,66 @@ void main() { outputColor = vec4(color,1.0); }
 	}
 
 private:
+    static GLuint CompileProgram(const char* vertex,const char* fragment) noexcept {
+        GLuint program=glCreateProgram();
+        const char* sources[2]={vertex,fragment};
+        const GLenum types[2]={GL_VERTEX_SHADER,GL_FRAGMENT_SHADER};
+        for(int i=0;i<2;++i) {
+            GLuint shader=glCreateShader(types[i]);
+            glShaderSource(shader,1,&sources[i],nullptr);glCompileShader(shader);
+            GLint ok=0;glGetShaderiv(shader,GL_COMPILE_STATUS,&ok);
+            if(!ok) { char log[2048];glGetShaderInfoLog(shader,sizeof(log),nullptr,log);
+                emscripten_log(EM_LOG_ERROR,"WebGL shader: %s",log);glDeleteShader(shader);glDeleteProgram(program);return 0; }
+            glAttachShader(program,shader);glDeleteShader(shader);
+        }
+        glLinkProgram(program);GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);
+        if(!ok) { char log[2048];glGetProgramInfoLog(program,sizeof(log),nullptr,log);
+            emscripten_log(EM_LOG_ERROR,"WebGL program: %s",log);glDeleteProgram(program);return 0; }
+        return program;
+    }
+    void DrawObject(const L3DMesh& mesh,const glm::mat4& model) const noexcept {
+        const auto& bones=mesh.GetBoneMatrices();
+        const auto boneCount=mesh.IsBoned() ? bones.size() : 0;
+        if(boneCount>64) return;
+        glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"model"),1,GL_FALSE,glm::value_ptr(model));
+        glUniform1i(glGetUniformLocation(_objectProgram,"boneCount"),boneCount);
+        if(boneCount) glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"bones[0]"),boneCount,GL_FALSE,glm::value_ptr(bones[0]));
+        const auto& textures=Locator::resources::value().GetTextures();
+        for(const auto& sub:mesh.GetSubMeshes()) {
+            const auto flags=sub->GetFlags();
+            if(flags.isPhysics || flags.status!=0 || (flags.lodMask&1)==0) continue;
+            const auto& geometry=sub->GetMesh();
+            const auto& vertices=geometry.GetVertexBuffer();const auto& indices=geometry.GetIndexBuffer();
+            glBindBuffer(GL_ARRAY_BUFFER,vertices.handle.id);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indices.handle.id);
+            for(GLuint i=4;i<7;++i)glDisableVertexAttribArray(i);
+            glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,vertices.strideBytes,nullptr);
+            glEnableVertexAttribArray(1);glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,vertices.strideBytes,reinterpret_cast<void*>(12));
+            glEnableVertexAttribArray(2);glVertexAttribPointer(2,3,GL_FLOAT,GL_FALSE,vertices.strideBytes,reinterpret_cast<void*>(20));
+            glEnableVertexAttribArray(3);glVertexAttribIPointer(3,2,GL_SHORT,vertices.strideBytes,reinterpret_cast<void*>(32));
+            for(const auto& primitive:sub->GetPrimitives()) {
+                const Texture2d* texture=nullptr;
+                if(auto found=mesh.GetSkins().find(primitive.skinID);found!=mesh.GetSkins().end())texture=found->second.get();
+                else if(textures.Contains(primitive.skinID))texture=textures.Handle(primitive.skinID).operator->();
+                glBindTexture(GL_TEXTURE_2D,texture ? texture->handle.id : 0);
+                glUniform1i(glGetUniformLocation(_objectProgram,"textured"),texture && texture->handle.id);
+                glUniform1i(glGetUniformLocation(_objectProgram,"diffuse"),0);
+                glUniform1f(glGetUniformLocation(_objectProgram,"alphaCutoff"),primitive.thresholdAlpha ? primitive.alphaCutoutThreshold : 0.01f);
+                glDepthMask(primitive.depthWrite ? GL_TRUE : GL_FALSE);
+                if(primitive.blend!=L3DSubMesh::Primitive::BlendMode::Disabled) {
+                    glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,primitive.blend==L3DSubMesh::Primitive::BlendMode::Additive ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA);
+                }else glDisable(GL_BLEND);
+                glDrawElements(GL_TRIANGLES,primitive.indicesCount,GL_UNSIGNED_SHORT,reinterpret_cast<void*>(primitive.indicesOffset*sizeof(uint16_t)));
+                if(!_modelsReported && !_objectErrorReported) {
+                    const auto error=glGetError();
+                    if(error) { emscripten_log(EM_LOG_ERROR,"Model %s: GL error 0x%x, stride %u, vertices %u, indices %u",mesh.GetDebugName().c_str(),error,vertices.strideBytes,vertices.vertexCount,indices.count);_objectErrorReported=true; }
+                }
+            }
+        }
+    }
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE _context {};
-    GLuint _program {}, _vao {};
+    GLuint _program {}, _objectProgram {}, _vao {};
+	bool _reported {}, _modelsReported {};
+    mutable bool _objectErrorReported {};
 	bool _debug {};
 	bool _profile {};
 };

@@ -33,3 +33,14 @@ This proves structural compatibility only. Creature morph timing/rotation conven
 4. Static HTTPS engine package, user-provided asset import, progress/error handling, measured memory/frame rate, and repeatable browser smoke tests.
 
 We have crossed compilation, renderer initialization and original asset startup. The renderer and gameplay gates remain substantial. This is several implementation milestones from a playable slice, not merely a hosting change; calendar estimates remain low-confidence until the first fully rendered island and animated character work together.
+
+
+## Original terrain and scene renderer checkpoint
+
+The browser renderer now uploads the original island BGR5A1 material array, blends the same per-triangle material channels as the native shader, applies the terrain light channel, and discards the hidden underwater triangles. The browser can draw the engine's prepared entity and tree batches, including original texture skins, rest-pose bone transforms, indexed primitives, alpha cutouts and basic blending. The shared BC1/BC2/BC3 decoder is used by native and browser uploads; packed BGRA4 and RGBA/BGRA8 skins are supported in the browser.
+
+The development launcher provides **Village view**, which moves the engine camera to the loaded Land1 village. It is a scene inspection shortcut, not new gameplay. Manual verification showed original buildings, fields and trees in their engine positions on the original textured landscape. Startup reported 100 terrain blocks, 65 entity batches and 16 tree batches; upload, terrain and model GL checks returned zero errors. The original browser failure was caused by creating an index buffer with the vertex-buffer target, then rebinding it as an index buffer, which WebGL disallows. Index uploads now use the element-buffer target and preserve the active VAO.
+
+Validation: full WASM Release build, native regression build, and deterministic decoder fixtures for BC1 opaque red, punch-through transparency, cropped edge output, BC2 explicit alpha and BC3 alpha. Reproduce the fixture with the local Emscripten compiler using `-std=c++23 -Isrc -I.local/wasm-build/vcpkg_installed/wasm32-emscripten/include tools/shade/test_texture_decode.cpp -o .local/test-texture-decode.js`, then run it with the local SDK Node executable.
+
+Limits: models use rest-pose bones, capped at 64 bones per mesh; animation playback is not implemented. Terrain morphing for buildings, tree sway, water/reflections, sky rendering, bump/footprint materials, complete texture-format coverage, draw-call optimization and gameplay interaction still need work. Existing upstream script gaps remain. This is the full engine rendering its own original scene, but it is not a playable vertical slice yet.
