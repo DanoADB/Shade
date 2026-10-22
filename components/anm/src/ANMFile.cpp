@@ -136,34 +136,35 @@ ANMResult ANMFile::ReadFile(std::istream& stream) noexcept
 	// First 84 bytes
 	stream.read(reinterpret_cast<char*>(&_header), sizeof(ANMHeader));
 
-	_keyframes.resize(_header.frameCount);
-	for (uint32_t i = 0; i < _header.frameCount; ++i)
-	{
-		stream.seekg(_header.framesBase + i * sizeof(uint32_t));
-
-		// In Keyframe offset block
-		uint32_t offset;
-		stream.read(reinterpret_cast<char*>(&offset), sizeof(offset));
-
-		// Keyframe pointer
-		stream.seekg(offset);
-		stream.read(reinterpret_cast<char*>(&offset), sizeof(offset));
-
-		// Bone offset block
-		stream.seekg(offset);
-		stream.read(reinterpret_cast<char*>(&offset), sizeof(offset));
-
-		// Bone block
-		stream.seekg(offset);
-		uint32_t boneCount;
-		stream.read(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
-
-		stream.read(reinterpret_cast<char*>(&_keyframes[i].time), sizeof(_keyframes[i].time));
-
-		_keyframes[i].bones.resize(boneCount);
-		stream.read(reinterpret_cast<char*>(_keyframes[i].bones.data()),
-		            _keyframes[i].bones.size() * sizeof(_keyframes[i].bones[0]));
-	}
+    if (!stream || _header.framesBase > fsize ||
+        _header.frameCount > (fsize - _header.framesBase) / sizeof(uint32_t))
+        return ANMResult::ErrFileTooSmall;
+    _keyframes.resize(_header.frameCount);
+    for (uint32_t i = 0; i < _header.frameCount; ++i)
+    {
+        uint32_t cursor = _header.framesBase + i * sizeof(uint32_t);
+        for (int level = 0; level < 3; ++level)
+        {
+            if (cursor > fsize - sizeof(uint32_t)) return ANMResult::ErrFileTooSmall;
+            stream.seekg(cursor);
+            stream.read(reinterpret_cast<char*>(&cursor), sizeof(cursor));
+            if (!stream) return ANMResult::ErrFileTooSmall;
+        }
+        if (cursor > fsize - 2 * sizeof(uint32_t)) return ANMResult::ErrFileTooSmall;
+        stream.seekg(cursor);
+        uint32_t boneCount = 0, boneDataOffset = 0;
+        stream.read(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
+        stream.read(reinterpret_cast<char*>(&boneDataOffset), sizeof(boneDataOffset));
+        if (!stream || boneDataOffset > fsize || boneCount > (fsize - boneDataOffset) / sizeof(ANMBone))
+            return ANMResult::ErrFileTooSmall;
+        // The second word points to matrices, not a timestamp. Packed frames
+        // uniformly divide the clip duration stored at header offset 0x20.
+        _keyframes[i].time = static_cast<uint32_t>(static_cast<uint64_t>(i) * GetDuration() / _header.frameCount);
+        stream.seekg(boneDataOffset);
+        _keyframes[i].bones.resize(boneCount);
+        stream.read(reinterpret_cast<char*>(_keyframes[i].bones.data()), boneCount * sizeof(ANMBone));
+        if (!stream) return ANMResult::ErrFileTooSmall;
+    }
 
 	_isLoaded = true;
 

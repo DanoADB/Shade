@@ -8,6 +8,7 @@
  *******************************************************************************/
 
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
 
@@ -302,5 +303,26 @@ extern "C" EMSCRIPTEN_KEEPALIVE int shade_resize(int width, int height)
     auto& window = openblack::Locator::windowing::value();
     if (window.GetSize() == glm::ivec2(width, height)) return 1;
     return SDL_SetWindowSize(static_cast<SDL_Window*>(window.GetHandle()), width, height) ? 1 : 0;
+}
+
+#include "ECS/Registry.h"
+#include "ECS/Components/Villager.h"
+#include "ECS/Components/Transform.h"
+#include <glm/geometric.hpp>
+extern "C" EMSCRIPTEN_KEEPALIVE int shade_villager_view()
+{
+    using namespace openblack;
+    if (!Locator::camera::has_value() || !Locator::entitiesRegistry::has_value()) return 0;
+    float nearest=std::numeric_limits<float>::max();
+    glm::vec3 target{};
+    Locator::entitiesRegistry::value().Each<const ecs::components::Villager,const ecs::components::Transform>(
+        [&](const auto&,const auto& transform) {
+            const auto delta=transform.position-glm::vec3(1920.0f,48.0f,2700.0f);
+            const float distance=glm::dot(delta,delta);
+            if(distance<nearest) {nearest=distance;target=transform.position;}
+        });
+    if(nearest==std::numeric_limits<float>::max())return 0;
+    Locator::camera::value().SetFocus(target+glm::vec3(0,1,0)).SetOrigin(target+glm::vec3(3,3,-5));
+    return 1;
 }
 #endif

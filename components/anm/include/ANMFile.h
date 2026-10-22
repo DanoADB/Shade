@@ -30,7 +30,7 @@ std::string_view ResultToStr(ANMResult result);
 struct ANMHeader
 {
 	std::array<char, 0x20> name;
-	uint32_t unknown0x20; // TODO(#471): Seems to be a uint16_t padded
+	uint32_t unknown0x20; // Clip duration in milliseconds in the packed game animations
 	float unknown0x24;    // TODO(#471)
 	float unknown0x28;    // TODO(#471)
 	float unknown0x2C;    // TODO(#471)
@@ -38,7 +38,7 @@ struct ANMHeader
 	float unknown0x34;    // TODO(#471)
 	uint32_t frameCount;
 	uint32_t unknown0x3C; // TODO(#471): Always 1 in Body Block, a count
-	uint32_t animationDuration;
+	uint32_t animationDuration; // Legacy name: serialized animation byte size, not playback duration
 	uint32_t unknown0x44; // TODO(#471): Always 1 in Body Block
 	uint32_t unknown0x48; // TODO(#471): Always 0 in Body Block
 	uint32_t framesBase;
@@ -88,6 +88,7 @@ public:
 	/// Write anm file to path on the filesystem
 	ANMResult Write(const std::filesystem::path& filepath) noexcept;
 
+	[[nodiscard]] uint32_t GetDuration() const noexcept { return _header.unknown0x20; }
 	[[nodiscard]] const ANMHeader& GetHeader() const noexcept { return _header; }
 	[[nodiscard]] ANMHeader& GetHeader() noexcept { return _header; }
 	[[nodiscard]] const std::vector<ANMFrame>& GetKeyframes() const noexcept { return _keyframes; }

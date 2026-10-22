@@ -58,3 +58,11 @@ The hosted package now includes all 718 prepared files as 694 unique gzip object
 Repackage with `python tools/shade/package_game_assets.py`, build the engine, and run `python tools/shade/package_engine.py`. Deploy the generated `web/dist/game-assets/` alongside `web/dist/engine/`. Both Docker entry points require the game manifest. Hash-named asset objects are served with immutable caching; manifests and engine scripts are fetched fresh. The first uncached load downloads roughly 340 MB and expands to roughly 434 MB in browser storage/memory before engine parsing, so this remains a desktop development build and needs loading/memory optimization before a broad release.
 
 The deployment is now intentionally prepopulated with the provided game files; the earlier bring-your-own-files hosting description above reflects the prior checkpoint.
+
+## Original villager playback checkpoint
+
+The WebGL engine now samples the original packed villager stand and male/female walk clips, composes their 22-bone hierarchy, and uploads the animated palette. Existing movement tags select walking; stationary villagers select stand. Per-entity phase offsets avoid synchronized poses. `Villager view` focuses a real loaded villager for inspection.
+
+The ANM reader now follows and bounds-checks the matrix pointers rather than treating a matrix offset as a timestamp. Current packed clips use header offset 0x20 as duration and evenly spaced frames; this interpretation is based on the inspected game data. Interpolation loops through the last-to-first interval. Invalid or incompatible skeletons retain the rest pose.
+
+Verified: browser and native builds succeed; synthetic tests cover parsing, interpolation, wrap, hierarchy and invalid offsets; the packaged browser boots Land1, reports `M_P_Stand, 22 bones, 1000 ms loop`, and renders a valid original villager pose with no console errors. Moving-villager visual verification, stride matching, transition blending, ground contact and creature morph animation remain unfinished. Native rendering is still rest pose. Earlier rest-pose-only notes describe previous checkpoints.

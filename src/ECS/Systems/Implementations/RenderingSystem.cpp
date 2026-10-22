@@ -24,6 +24,8 @@
 #include "ECS/Components/Temple.h"
 #include "ECS/Components/Transform.h"
 #include "ECS/Components/Tree.h"
+#include "ECS/Components/Villager.h"
+#include "ECS/Components/WallHug.h"
 #include "ECS/Registry.h"
 #include "ECS/Systems/HandSystemInterface.h"
 #include "ECS/Systems/TimeSystemInterface.h"
@@ -123,6 +125,7 @@ void RenderingSystem::PrepareDrawUploadUniforms(bool drawBoundingBox)
 {
 	auto& registry = Locator::entitiesRegistry::value();
 
+    _renderContext.instanceAnimations.assign(_renderContext.instanceUniforms.size(), {});
 	// Store offsets of uniforms for descs
 	std::map<RenderContext::InstancedDrawKey, uint32_t> uniformOffsets;
 
@@ -139,6 +142,14 @@ void RenderingSystem::PrepareDrawUploadUniforms(bool drawBoundingBox)
 
 		    const uint32_t idx = desc->second.offset + offset.first->second;
 		    _renderContext.instanceUniforms[idx] = modelMatrix;
+            if (const auto* villager = registry.TryGet<const Villager>(entity))
+            {
+                const bool moving = registry.AnyOf<MoveStateLinearTag, MoveStateOrbitTag, MoveStateExitCircleTag,
+                                                   MoveStateStepThroughTag>(entity);
+                const auto walk = villager->sex == Villager::Sex::FEMALE ? AnimId::PWalkWoman : AnimId::PWalkMan;
+                _renderContext.instanceAnimations[idx] = {moving ? walk : AnimId::PStand,
+                    static_cast<uint32_t>(entity) * 137u};
+            }
 		    if (drawBoundingBox)
 		    {
 			    auto l3dMesh = entt::locator<resources::ResourcesInterface>::value().GetMeshes().Handle(mesh.id);

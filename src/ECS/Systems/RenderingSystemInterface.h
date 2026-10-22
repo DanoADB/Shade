@@ -16,6 +16,7 @@
 #include <glm/mat4x4.hpp>
 
 #include "Graphics/Mesh.h"
+#include "3D/AllMeshes.h"
 
 namespace openblack::ecs::systems
 {
@@ -47,6 +48,12 @@ struct RenderContext
 	/// If debug bounding boxes are enabled, it will double in size to fit all
 	/// bounding boxes in the second half of the list.
 	std::vector<glm::mat4> instanceUniforms;
+    struct InstanceAnimation
+    {
+        AnimId clip {AnimId::Invalid};
+        uint32_t phase {0};
+    };
+    std::vector<InstanceAnimation> instanceAnimations;
 
 	/// Tree instance data structure that combines model matrix and sway parameters
 	struct TreeInstanceData

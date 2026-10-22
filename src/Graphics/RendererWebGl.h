@@ -25,6 +25,7 @@
 #include "Graphics/Mesh.h"
 #include "Locator.h"
 #include "3D/L3DMesh.h"
+#include "3D/AnimationSampling.h"
 #include "3D/L3DSubMesh.h"
 #include "ECS/Systems/RenderingSystemInterface.h"
 #include "Resources/ResourcesInterface.h"
@@ -190,7 +191,9 @@ void main() {
             if(!meshes.Contains(key.meshId)) continue;
             const auto mesh=meshes.Handle(key.meshId);
             for(uint32_t i=0;i<instances.count;++i)
-                DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i));
+                DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),
+                    context.instanceAnimations.at(instances.offset+i).clip,
+                    desc.time+context.instanceAnimations.at(instances.offset+i).phase);
         }
         if(desc.drawVegetation) for(const auto& [id,instances]:context.treeInstancedDrawDescs) {
             if(!meshes.Contains(id)) continue;
@@ -348,8 +351,23 @@ private:
             emscripten_log(EM_LOG_ERROR,"WebGL program: %s",log);glDeleteProgram(program);return 0; }
         return program;
     }
-    void DrawObject(const L3DMesh& mesh,const glm::mat4& model) const noexcept {
-        const auto& bones=mesh.GetBoneMatrices();
+    void DrawObject(const L3DMesh& mesh,const glm::mat4& model, AnimId clip=AnimId::Invalid, uint32_t time=0) const noexcept {
+        const auto* palette=&mesh.GetBoneMatrices();
+        std::vector<glm::mat4> posed;
+        auto& animations=Locator::resources::value().GetAnimations();
+        const auto clipId=resources::HashIdentifier(clip);
+        if (mesh.IsBoned() && clip >= AnimId::BatEraticglide && animations.Contains(clipId)) {
+            const auto clipResource=animations.Handle(clipId);
+            posed=clipResource->GetBoneMatrices(time);
+            if (animation::ComposeHierarchy(posed,mesh.GetBoneParents())) {
+                palette=&posed;
+                if (!_animationReported) {
+                    emscripten_log(EM_LOG_CONSOLE,"Original animation playback: %s, %zu bones, %u ms loop",clipResource->GetName().c_str(),posed.size(),clipResource->GetDuration());
+                    _animationReported=true;
+                }
+            }
+        }
+        const auto& bones=*palette;
         const auto boneCount=mesh.IsBoned() ? bones.size() : 0;
         if(boneCount>64) return;
         glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"model"),1,GL_FALSE,glm::value_ptr(model));
@@ -390,7 +408,7 @@ private:
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE _context {};
     GLuint _program {}, _objectProgram {}, _vao {};
 	bool _reported {}, _modelsReported {};
-    mutable bool _objectErrorReported {};
+    mutable bool _objectErrorReported {}, _animationReported {};
 	bool _debug {};
 	bool _profile {};
 };
