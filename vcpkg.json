@@ -9,7 +9,7 @@
         {
             "name": "sdl3",
             "features": [ "vulkan" ],
-            "platform": "linux | android"
+            "platform": "linux | android | windows"
         },
         {
             "name": "imgui",
@@ -24,7 +24,7 @@
             "name": "cxxopts",
             "host": true
         },
-        "openal-soft",
+        { "name": "openal-soft", "platform": "!emscripten" },
         "drlibs",
         "bullet3",
         "minizip",

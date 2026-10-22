@@ -256,7 +256,7 @@ else ()
         COMPILE_FLAGS_DEBUG "-g3 -gsource-map"
         LINK_FLAGS_DEBUG "-g3 -gsource-map"
         COMPILE_FLAGS "-fexceptions"
-        LINK_FLAGS "-s ALLOW_MEMORY_GROWTH=1 -fexceptions --emrun"
+        LINK_FLAGS "-s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=4194304 -fexceptions --emrun"
         SUFFIX ".html"
     )
   elseif (APPLE)

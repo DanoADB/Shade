@@ -21,6 +21,7 @@
 
 using namespace openblack::audio;
 
+#ifndef __EMSCRIPTEN__
 void ALC_APIENTRY AudioPlayerAlLogger([[maybe_unused]] void* userptr, char level, const char* message,
                                       [[maybe_unused]] int length) noexcept
 {
@@ -44,8 +45,12 @@ void ALC_APIENTRY AudioPlayerAlLogger([[maybe_unused]] void* userptr, char level
 	}
 }
 
+#endif
+
 void AudioPlayer::SetupLogging()
 {
+#ifndef __EMSCRIPTEN__
+	// OpenAL Soft logging extensions do not exist in Emscripten Web Audio.
 	auto* alsoftSetLogCallback = reinterpret_cast<void (*)(void (*)(void*, char, const char*, int) noexcept, void*) noexcept>(
 	    alcGetProcAddress(nullptr, "alsoft_set_log_callback"));
 	if (alsoftSetLogCallback != nullptr)
@@ -90,6 +95,7 @@ void AudioPlayer::SetupLogging()
 		setenv("ALSOFT_LOGLEVEL", levelStr.data(), 0);
 #endif
 	}
+#endif
 }
 
 void AudioPlayer::Initialize()

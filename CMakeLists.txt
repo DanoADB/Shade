@@ -98,7 +98,14 @@ find_path(
   PATHS /usr/include/dr_libs
 )
 
-find_package(OpenAL REQUIRED)
+if (EMSCRIPTEN)
+  # Emscripten supplies the OpenAL API through Web Audio. OpenAL Soft's
+  # native thread-local storage is not available in the single-threaded build.
+  add_library(OpenAL::OpenAL INTERFACE IMPORTED)
+  set_property(TARGET OpenAL::OpenAL PROPERTY INTERFACE_LINK_LIBRARIES openal)
+else ()
+  find_package(OpenAL REQUIRED)
+endif ()
 find_package(imgui REQUIRED)
 find_package(Bullet REQUIRED)
 find_package(spdlog 1.3.0 REQUIRED)

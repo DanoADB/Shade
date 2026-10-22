@@ -1,5 +1,7 @@
 # Shade development roadmap
 
+> Superseded sequencing: as of October 22, 2026, the priority is full openblack engine operation in the browser before Shade gameplay changes. See [OPENBLACK_BROWSER_PORT.md](OPENBLACK_BROWSER_PORT.md). This document preserves the earlier prototype milestones.
+
 Updated October 21, 2026. This is the working delivery roadmap; SHADE_BROWSER_PLAN.md retains the original goals and engine-port hypothesis.
 
 ## Product milestone
