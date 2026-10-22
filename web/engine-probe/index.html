@@ -1,1 +1,27 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shade — C++ WebGL2 Probe</title><style>body{margin:0;background:#101b20;color:#e1eee8;font:16px system-ui}header{padding:15px 22px;display:flex;justify-content:space-between}canvas{width:100%;height:calc(100vh - 120px);display:block}aside{padding:10px 22px;color:#b7ccc6;font-size:14px}a{color:#b3e1d4}</style></head><body><header><strong>SHADE / C++ graphics probe</strong><a href="/">Prototype</a></header><canvas id="canvas" width="1280" height="720"></canvas><aside>WebGL2 procedural island from C++ / WebAssembly. Arrows or WASD rotate and tilt; wheel zooms. This is not yet the openblack terrain renderer.</aside><script>var Module={canvas:document.getElementById('canvas'),printErr:function(x){console.error(x)}};</script><script src="/engine-probe/probe.js"></script></body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shade — C++ WebGL2 Probe</title>
+<style>
+body{margin:0;background:#101b20;color:#e1eee8;font:16px system-ui;min-height:100vh;display:flex;flex-direction:column}
+header{padding:15px 22px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+canvas{width:100%;height:calc(100vh - 170px);min-height:240px;display:block;outline-offset:-3px}
+aside{padding:10px 22px;color:#b7ccc6;font-size:14px}a{color:#b3e1d4}
+#status{margin:0;padding:8px 22px;background:#1a3034}#status.error{background:#552c30;color:#ffe0de}
+</style></head><body>
+<header><strong>SHADE / C++ graphics probe</strong><a href="/">Prototype</a></header>
+<p id="status" role="status" aria-live="polite">Loading C++ / WebAssembly…</p>
+<canvas id="canvas" width="1280" height="720" tabindex="0" aria-label="Procedural island. Arrow keys or WASD rotate and tilt; mouse wheel zooms."></canvas>
+<aside>WebGL2 procedural island from C++ / WebAssembly. Arrows or WASD rotate and tilt; wheel zooms. This is not yet the openblack terrain renderer.</aside>
+<script>
+const statusEl=document.getElementById('status');
+let failed=false;
+function probeError(message){failed=true;statusEl.className='error';statusEl.textContent='Probe error: '+message;}
+window.shadeProbeReady=function(){if(!failed)statusEl.textContent='Running · C++ / WebAssembly · WebGL2';};
+window.addEventListener('error',event=>probeError(event.message||'A script or resource failed to load.'));
+window.addEventListener('unhandledrejection',event=>probeError(String(event.reason)));
+const probeCanvas=document.getElementById('canvas');
+probeCanvas.addEventListener('webglcontextlost',()=>probeError('Graphics context lost. Reload to restart.'));
+var Module={canvas:probeCanvas,printErr:function(message){console.error(message);probeError(message);},onAbort:function(reason){probeError(String(reason));}};
+</script>
+<script src="/engine-probe/probe.js" onerror="probeError('Could not load probe.js. Build the probe and reload.')"></script>
+</body></html>

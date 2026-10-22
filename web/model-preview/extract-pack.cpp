@@ -1,0 +1,5 @@
+#include "PackFile.h"
+#include <fstream>
+#include <iostream>
+int main(int argc,char**argv){using namespace openblack::pack;if(argc!=3)return 1;PackFile p;auto r=p.Open(argv[1]);if(r!=PackResult::Success){std::cerr<<ResultToStr(r);return 2;}std::filesystem::create_directories(argv[2]);for(int i:{74,75,76,443,446,571,583,590}){auto& data=p.GetMesh(i);std::ofstream f(std::string(argv[2])+"/"+std::to_string(i)+".l3d",std::ios::binary);f.write((char*)data.data(),data.size());}for(auto& [name,t]:p.GetTextures()){std::ofstream f(std::string(argv[2])+"/"+std::to_string(t.header.id)+".dds",std::ios::binary);f.write("DDS ",4);f.write((char*)&t.ddsHeader,sizeof(t.ddsHeader));f.write((char*)t.ddsData.data(),t.ddsData.size());}std::cout<<p.GetMeshes().size()<<" meshes, "<<p.GetTextures().size()<<" textures\n";}
+

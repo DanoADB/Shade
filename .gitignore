@@ -45,3 +45,12 @@ openblack.log
 screenshot.png
 compile_commands.json
 .cache
+
+# Windows browser probe build entry point
+!/web/engine-probe/build.ps1
+
+# Local SDKs, original game data, generated previews and Python caches
+.local/
+web/dist/engine-probe/
+__pycache__/
+*.pyc

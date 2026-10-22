@@ -19,6 +19,19 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self):
+        if self.path == "/local-cow.json" and os.environ.get("SHADE_COW_PREVIEW"):
+            path = Path(os.environ["SHADE_COW_PREVIEW"])
+            if not path.is_file():
+                self.send_error(404, "Local cow export missing")
+                return
+            payload = path.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         if self.path == "/healthz":
             payload = json.dumps({
                 "service": "shade-web",
@@ -34,4 +47,4 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     DIST.mkdir(parents=True, exist_ok=True)
-    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    ThreadingHTTPServer(("127.0.0.1" if os.environ.get("SHADE_COW_PREVIEW") else "0.0.0.0", PORT), Handler).serve_forever()

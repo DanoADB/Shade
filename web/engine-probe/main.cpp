@@ -86,6 +86,15 @@ void render() {
     if(held['d']||held['D']||held[39]) angle+=dt*1.1f;
     if(held['w']||held['W']||held[38]) pitch=std::fmin(1.25f,pitch+dt*0.8f);
     if(held['s']||held['S']||held[40]) pitch=std::fmax(0.16f,pitch-dt*0.8f);
+    double cssWidth=0,cssHeight=0;
+    emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight);
+    const double ratio=emscripten_get_device_pixel_ratio();
+    const int desiredWidth=static_cast<int>(std::fmax(1.0,cssWidth*ratio));
+    const int desiredHeight=static_cast<int>(std::fmax(1.0,cssHeight*ratio));
+    int currentWidth=0,currentHeight=0;
+    emscripten_get_canvas_element_size("#canvas",&currentWidth,&currentHeight);
+    if(currentWidth!=desiredWidth || currentHeight!=desiredHeight)
+        emscripten_set_canvas_element_size("#canvas",desiredWidth,desiredHeight);
     int width=0,height=0;
     emscripten_get_canvas_element_size("#canvas",&width,&height);
     glViewport(0,0,width,height);
@@ -111,6 +120,10 @@ EM_BOOL key(int type,const EmscriptenKeyboardEvent* event,void*) {
     if(code>=0&&code<512)held[code]=(type==EMSCRIPTEN_EVENT_KEYDOWN);
     return code==37||code==38||code==39||code==40;
 }
+EM_BOOL blur(int,const EmscriptenFocusEvent*,void*) {
+    for(bool& pressed:held) pressed=false;
+    return EM_FALSE;
+}
 EM_BOOL wheel(int,const EmscriptenWheelEvent* event,void*) {
     zoom=std::fmax(5.0f,std::fmin(18.0f,zoom+(float)event->deltaY*0.01f));
     return EM_TRUE;
@@ -121,7 +134,7 @@ int main() {
     emscripten_webgl_init_context_attributes(&attributes);
     attributes.majorVersion=2;
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context=emscripten_webgl_create_context("#canvas",&attributes);
-    if(context<=0) {std::fprintf(stderr,"WebGL2 unavailable: %d\n",context);return 1;}
+    if(context<=0) {std::fprintf(stderr,"WebGL2 unavailable: %lu\n",static_cast<unsigned long>(context));return 1;}
     emscripten_webgl_make_context_current(context);
     GLuint vs=compile(GL_VERTEX_SHADER,vertexSource),fs=compile(GL_FRAGMENT_SHADER,fragmentSource);
     program=glCreateProgram();glAttachShader(program,vs);glAttachShader(program,fs);glLinkProgram(program);
@@ -135,8 +148,11 @@ int main() {
     glEnable(GL_DEPTH_TEST);
     emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW,nullptr,true,key);
     emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW,nullptr,true,key);
+    emscripten_set_blur_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW,nullptr,true,blur);
     emscripten_set_wheel_callback("#canvas",nullptr,true,wheel);
     previous=emscripten_get_now();
+    render();
+    EM_ASM({window.shadeProbeReady();});
     emscripten_set_main_loop(render,0,true);
     return 0;
 }
