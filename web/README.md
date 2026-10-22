@@ -4,15 +4,15 @@ The static host serves the packaged full OpenBlack WebGL2 engine at `/engine/ope
 
 ## Prepare a release
 
-Build and verify the full engine with `tools/shade/wasm.ps1 -Action Build`, then run `python tools/shade/package_engine.py`. This copies only the HTML, JavaScript and WASM engine artifacts into `web/dist/engine/` and records their source revision, lengths and SHA-256 hashes in `manifest.json`. Include these packaged engine files in the reviewed deployment commit. Regenerate the package after engine or launcher changes; the current Docker images package this verified build rather than rebuilding the full engine toolchain.
+Build and verify the full engine with `tools/shade/wasm.ps1 -Action Build`, then run `python tools/shade/package_engine.py`. Run `python tools/shade/package_game_assets.py` to package the prepared game files, then package the engine. The engine packager copies the HTML, JavaScript and WASM engine artifacts into `web/dist/engine/` and records their source revision, lengths and SHA-256 hashes in `manifest.json`. Include these packaged engine files in the reviewed deployment commit. Regenerate the package after engine or launcher changes; the current Docker images package this verified build rather than rebuilding the full engine toolchain.
 
-Run `python web/serve.py` for a local smoke test. Open `/`, launch the engine, choose a prepared game folder containing Data, Scripts and Audio, then select Village view or Village close-up. Folder selection reads the files into browser memory; it does not upload game data to the host. Original game files remain outside the deployment package.
+Run `python web/serve.py` for a local smoke test. Open `/`, launch the engine, wait for the automatic game-file download, then select Village view or Village close-up. Hosted files are loaded into browser memory without requiring visitors to provide a folder. The optional folder picker is a fallback for development hosts without a game pack.
 
 ## Railway
 
 `railway.json` selects the root `Dockerfile`. Both Dockerfiles copy `web/dist/engine/` and fail if the three engine artifacts are missing. Railway supplies PORT; health check is `/healthz`. That endpoint reports package presence and the engine manifest, not gameplay readiness. Engine files are served without caching so JavaScript and WASM from different builds are not mixed.
 
-After the deployment commit is approved and pushed, verify the live health manifest, `/model-preview/` redirect and `/engine/openblack.html`, then load local game files. Railway cannot read the development machine's desktop folder automatically.
+After the deployment commit is pushed, verify the live health manifest, `/model-preview/` redirect and `/engine/openblack.html`, then confirm the scene starts without selecting a folder. The deployment includes 718 prepared game files, compressed as content-addressed gzip objects (about 340 MB). Each decoded file is checked against its original length and SHA-256 before installation. Objects are cached by hash; the manifest is fetched fresh.
 
 The Docker executable is unavailable on the current development machine, so the container build has not been tested here. The same Python static host and packaged files have been tested locally, including a successful browser folder import reproducing the original hand/village/tree scene. The existing GitHub `shade-web.yml` workflow is a separate source compilation experiment; it is not the artifact source for this package.
 

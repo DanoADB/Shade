@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Shade engine development</title>
 <style>body{margin:0;background:#151b20;color:#edf2e7;font:16px system-ui}header{padding:16px}canvas{width:100%;height:70vh;display:block}textarea{width:100%;height:18vh;background:#101419;color:#bde0bb}button{padding:8px}#status{margin-left:16px}</style></head>
-<body><header><b>Shade · original engine development</b> <button id="load">Load local game files</button><button id="village" disabled>Village view</button><button id="closeup" disabled>Village close-up</button><span id="status">Select your prepared game folder to start.</span><input id="folder" type="file" webkitdirectory multiple hidden></header>
+<body><header><b>Shade · original engine development</b> <button id="load">Load local game files</button><button id="village" disabled>Village view</button><button id="closeup" disabled>Village close-up</button><span id="status">Preparing game files…</span><input id="folder" type="file" webkitdirectory multiple hidden></header>
 <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas><textarea id="output" readonly aria-label="Engine log"></textarea>
 <script>
 var Module = {
@@ -24,26 +24,49 @@ var Module = {
    button.disabled=true;
    try {
     Module.FS.mkdirTree('/game');
-    let count=0;
-    for(const entry of entries) {
-     const path=safePath(entry.path);
-     Module.FS.mkdirTree(path.slice(0,path.lastIndexOf('/')));
-     Module.FS.writeFile(path,new Uint8Array(await entry.read()));
-     Module.setStatus('Loading game files '+(++count)+' / '+entries.length);
-    }
+    let next=0,count=0,loaded=0;
+    const total=entries.reduce((sum,entry)=>sum+(entry.bytes||0),0);
+    const worker=async()=>{
+     while(next<entries.length) {
+      const entry=entries[next++],path=safePath(entry.path);
+      const payload=new Uint8Array(await entry.read());
+      if(entry.sha256) {
+       const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',payload)),v=>v.toString(16).padStart(2,'0')).join('');
+       if(digest!==entry.sha256 || payload.length!==entry.bytes) throw Error('Damaged game file: '+entry.path);
+      }
+      Module.FS.mkdirTree(path.slice(0,path.lastIndexOf('/')));
+      Module.FS.writeFile(path,payload);
+      loaded+=payload.length;count++;
+      Module.setStatus('Loading game files '+count+' / '+entries.length+(total ? ' · '+Math.round(loaded/1048576)+' / '+Math.round(total/1048576)+' MB' : ''));
+     }
+    };
+    const results=await Promise.allSettled(Array.from({length:4},worker));
+    for(const result of results)if(result.status==='rejected')throw result.reason;
     for(const path of ['Scripts/Land1.txt','Scripts/info.dat','Data/AllMeshes.g3d','Data/AllAnims.anm'])
      if(!Module.FS.analyzePath('/game/'+path).exists) throw Error('Missing '+path+'; select the prepared Data/Scripts/Audio folder.');
     for(const path of ['Scripts/Playgrounds','Scripts/Quests','Scripts/CreatureMind']) Module.FS.mkdirTree('/game/'+path);
     Module.setStatus('Starting original engine…');
     Module.removeRunDependency('original-assets');
-   } catch(error) { Module.printErr(String(error));Module.setStatus('Asset import failed: '+error.message);button.disabled=false; }
+   } catch(error) { Module.printErr(String(error));Module.setStatus('Asset import failed: '+error.message);button.disabled=false;button.hidden=false; }
   }
   button.onclick=()=>folder.click();
   folder.onchange=()=>install(Array.from(folder.files,f=>({path:f.webkitRelativePath.split('/').slice(1).join('/'),read:()=>f.arrayBuffer()})));
+  button.hidden=true;
   if(new URLSearchParams(location.search).has('local')) {
    fetch('/local-assets/manifest').then(r=>{if(!r.ok)throw Error('Local asset host unavailable');return r.json();})
     .then(manifest=>install(manifest.files.map(path=>({path,read:async()=>{const r=await fetch('/local-assets/file/'+path.split('/').map(encodeURIComponent).join('/'));if(!r.ok)throw Error('Missing '+path);return r.arrayBuffer();}}))))
-    .catch(error=>Module.setStatus(error.message));
+    .catch(error=>{Module.setStatus(error.message);button.hidden=false;});
+  } else {
+   Module.setStatus('Downloading game files…');
+   fetch('/game-assets/manifest.json',{cache:'no-store'}).then(r=>{
+    if(!r.ok)throw Error('Hosted game files unavailable');return r.json();
+   }).then(manifest=>{
+    if(manifest.version!==1 || !Array.isArray(manifest.files) || !manifest.files.length)throw Error('Invalid game-file manifest');
+    return install(manifest.files.map(entry=>{
+     if(!/^\/game-assets\/objects\/[a-f0-9]{64}\.gz$/.test(entry.url) || !/^[a-f0-9]{64}$/.test(entry.sha256))throw Error('Invalid game-file entry');
+     return {...entry,read:async()=>{const r=await fetch(entry.url);if(!r.ok)throw Error('Download failed: '+entry.path);return r.arrayBuffer();}};
+    }));
+   }).catch(error=>{Module.setStatus('Game files could not load: '+error.message);button.hidden=false;});
   }
  }]
 };

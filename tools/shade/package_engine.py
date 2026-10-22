@@ -29,7 +29,7 @@ def main():
         files[name] = {'bytes': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()}
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     manifest = {'source_revision': revision, 'engine': 'openblack-webgl2',
-                'original_assets_bundled': False, 'files': files}
+                'original_assets_bundled': (ROOT / 'web/dist/game-assets/manifest.json').is_file(), 'files': files}
     (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print(f'Packaged {sum(f["bytes"] for f in files.values()):,} bytes at {destination}')
 

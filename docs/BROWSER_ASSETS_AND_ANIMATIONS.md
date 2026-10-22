@@ -49,3 +49,12 @@ Limits: models use rest-pose bones, capped at 64 bones per mesh; animation playb
 ### Original art sources
 
 The browser scene uses the original game art supplied locally: the god hand is `Data/CreatureMesh/Hand_Boned_Base2.l3d` (169 triangles, 22 bones, one embedded skin); village buildings, villagers, fields and tree models come from `Data/AllMeshes.g3d` and its packed textures; the island materials come from `Data/Landscape/Land1.lnd`. The engine updates the hand entity through its existing terrain raycast/input path. `Village close-up` is a closer development camera for inspecting these assets. Rest-pose rendering does not yet reproduce the original game's animated gestures or complete lighting.
+
+
+## Hosted automatic game files
+
+The hosted package now includes all 718 prepared files as 694 unique gzip objects (339,653,335 bytes on disk). The engine fetches the game manifest automatically and uses four concurrent download workers. HTTP Content-Encoding lets the browser decompress each file; the loader verifies its decoded SHA-256 and length before writing it to the Emscripten filesystem. No folder selection is required on the hosted path. The optional folder picker appears only if the hosted files fail to load. The loopback `?local=1` development path remains available.
+
+Repackage with `python tools/shade/package_game_assets.py`, build the engine, and run `python tools/shade/package_engine.py`. Deploy the generated `web/dist/game-assets/` alongside `web/dist/engine/`. Both Docker entry points require the game manifest. Hash-named asset objects are served with immutable caching; manifests and engine scripts are fetched fresh. The first uncached load downloads roughly 340 MB and expands to roughly 434 MB in browser storage/memory before engine parsing, so this remains a desktop development build and needs loading/memory optimization before a broad release.
+
+The deployment is now intentionally prepopulated with the provided game files; the earlier bring-your-own-files hosting description above reflects the prior checkpoint.

@@ -1,11 +1,11 @@
 {
-  "source_revision": "b1a4289a9ff9e0acc4528dfa3a988c4450eb11b7",
+  "source_revision": "a549f95fcd401fc590f0a762bc5d8e2cb9f975b5",
   "engine": "openblack-webgl2",
-  "original_assets_bundled": false,
+  "original_assets_bundled": true,
   "files": {
     "openblack.html": {
-      "bytes": 3598,
-      "sha256": "61994ea75326735026194c0e4a74cb8d1d54fc4566ae2945929a491d7c333655"
+      "bytes": 4766,
+      "sha256": "6b4294f2aad3222ee1c5764c877b18d099bf16a517d62a5c717102497b95bd60"
     },
     "openblack.js": {
       "bytes": 273112,

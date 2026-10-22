@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal static host for Shade browser artifacts. No proprietary assets bundled."""
+"""Static host for Shade engine and prepackaged game files."""
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import json
@@ -18,6 +18,12 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         # JS/WASM must come from the same engine build.
         if self.path.split("?", 1)[0].startswith("/engine/"):
+            self.send_header("Cache-Control", "no-store")
+        route = self.path.split("?", 1)[0]
+        if route.startswith("/game-assets/objects/") and route.endswith(".gz"):
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        elif route == "/game-assets/manifest.json":
             self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
@@ -46,6 +52,7 @@ class Handler(SimpleHTTPRequestHandler):
             payload = json.dumps({
                 "service": "shade-web",
                 "engine_artifact_present": all((DIST / "engine" / name).is_file() for name in ("openblack.html", "openblack.js", "openblack.wasm")),
+                "hosted_game_files_present": (DIST / "game-assets/manifest.json").is_file(),
                 "engine_manifest": json.loads((DIST / "engine/manifest.json").read_text()) if (DIST / "engine/manifest.json").is_file() else None,
             }).encode()
             self.send_response(200)
