@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "RendererInterface.h"
+#include "BrowserDrought.h"
 #include "BlockTextureDecode.h"
 #include <GLES3/gl3.h>
 #include <GLES2/gl2ext.h>
@@ -108,6 +109,9 @@ uniform sampler2D bumpMap;
 uniform sampler2D smallBump;
 uniform sampler2D footprint;
 uniform vec3 skyAndBump;
+uniform float shadeLook;
+uniform float shadeRain;
+uniform float shadeDryness;
 out vec4 outputColor;
 void main() {
     if(alpha == 0.0) discard;
@@ -122,6 +126,11 @@ void main() {
     vec4 decal=texture(footprint,footprintUv);
     color=mix(color,decal.rgb,decal.a);
     color*=mix(0.25,clamp(lighting*2.0,0.5,1.0),skyAndBump.x/2.0);
+    if(shadeLook>0.5){
+        color=pow(max(color,vec3(0.0)),vec3(0.94))*mix(vec3(1.0),vec3(1.04,1.02,0.90),shadeDryness);
+        float haze=1.0-exp(-max(0.0,-distanceToCamera-80.0)*0.0018);
+        color=mix(color,mix(vec3(0.64,0.72,0.65),vec3(0.43,0.56,0.63),shadeRain),haze*0.7);
+    }
     outputColor=vec4(color,alpha);
 }
 )";
@@ -173,6 +182,10 @@ in vec3 worldNormal;
 uniform sampler2D diffuse;
 uniform bool textured;
 uniform float alphaCutoff;
+uniform float shadeLook;
+uniform float shadeRain;
+uniform float shadeDryness;
+uniform vec3 cameraOrigin;
 uniform float skyType;
 uniform bool vegetation;
 out vec4 outputColor;
@@ -183,7 +196,13 @@ void main() {
     float ambient=vegetation?brightness*0.25+0.75:brightness*0.25+0.25;
     vec3 lightDirection=normalize(vec3(-4000.0,1300.0,-1435.0)-worldPosition);
     float lighting=ambient+brightness*max(dot(worldNormal,lightDirection),0.0)*(vegetation?0.25:0.75);
-    outputColor=vec4(color.rgb*lighting,color.a);
+    vec3 shaded=color.rgb*lighting;
+    if(shadeLook>0.5){
+        shaded=pow(max(shaded,vec3(0.0)),vec3(0.94))*mix(vec3(1.0),vec3(1.04,1.02,0.90),shadeDryness);
+        float haze=1.0-exp(-max(0.0,length(worldPosition-cameraOrigin)-80.0)*0.0018);
+        shaded=mix(shaded,mix(vec3(0.64,0.72,0.65),vec3(0.43,0.56,0.63),shadeRain),haze*0.7);
+    }
+    outputColor=vec4(shaded,color.a);
 })";
         renderer->_objectProgram=CompileProgram(objectVertex,objectFragment);
         const char* skyVertex=R"(#version 300 es
@@ -354,6 +373,8 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         if(desc.drawSky && Locator::skySystem::has_value())DrawSky(*desc.camera);
         if(desc.drawWater && Locator::oceanSystem::has_value())DrawWater(*desc.camera);
         glUseProgram(_program); glBindVertexArray(_vao);
+        glUniform1f(glGetUniformLocation(_program,"shadeLook"),Locator::config::value().hidePlayerHand?1.f:0.f);
+        glUniform1f(glGetUniformLocation(_program,"shadeRain"),browser::droughtRain);glUniform1f(glGetUniformLocation(_program,"shadeDryness"),browser::droughtDryness);
         glEnable(GL_BLEND);glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY,static_cast<GLuint>(Locator::terrainSystem::value().GetAlbedoArray().handle.id));
@@ -404,11 +425,15 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         glActiveTexture(GL_TEXTURE4);glBindTexture(GL_TEXTURE_2D,island.GetHeightMap().handle.id);
         glUniform1i(glGetUniformLocation(_objectProgram,"heightMap"),4);glActiveTexture(GL_TEXTURE0);
         glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
+        glUniform1f(glGetUniformLocation(_objectProgram,"shadeLook"),Locator::config::value().hidePlayerHand?1.f:0.f);
+        glUniform1f(glGetUniformLocation(_objectProgram,"shadeRain"),browser::droughtRain);glUniform1f(glGetUniformLocation(_objectProgram,"shadeDryness"),browser::droughtDryness);
+        const auto cameraOrigin=desc.camera->GetOrigin();glUniform3fv(glGetUniformLocation(_objectProgram,"cameraOrigin"),1,glm::value_ptr(cameraOrigin));
         const auto& context=Locator::rendereringSystem::value().GetContext();
         const auto& meshes=Locator::resources::value().GetMeshes();
         const ecs::systems::RenderContext::InstanceAnimation restPose{};
         if (desc.drawEntities) for(const auto& [key,instances]:context.instancedDrawDescs) {
             if(!meshes.Contains(key.meshId)) continue;
+            if(Locator::config::value().hidePlayerHand && key.meshId==resources::HashIdentifier(std::string("hand")))continue;
             const auto mesh=meshes.Handle(key.meshId);
             for(uint32_t i=0;i<instances.count;++i) {
                 const auto index=instances.offset+i;
@@ -479,6 +504,9 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         glBindVertexArray(_vao);glUseProgram(_objectProgram);
         const auto matrix=desc.camera->GetViewProjectionMatrix(Camera::Projection::Normal);
         glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
+        glUniform1f(glGetUniformLocation(_objectProgram,"shadeLook"),Locator::config::value().hidePlayerHand?1.f:0.f);
+        glUniform1f(glGetUniformLocation(_objectProgram,"shadeRain"),browser::droughtRain);glUniform1f(glGetUniformLocation(_objectProgram,"shadeDryness"),browser::droughtDryness);
+        const auto cameraOrigin=desc.camera->GetOrigin();glUniform3fv(glGetUniformLocation(_objectProgram,"cameraOrigin"),1,glm::value_ptr(cameraOrigin));
         glUniform1f(glGetUniformLocation(_objectProgram,"skyType"),Locator::skySystem::value().GetCurrentSkyType());
         const auto& island=Locator::terrainSystem::value();const auto extent=island.GetExtent();const auto bounds=glm::vec4(extent.minimum,extent.maximum);
         glUniform4fv(glGetUniformLocation(_objectProgram,"islandExtent"),1,glm::value_ptr(bounds));

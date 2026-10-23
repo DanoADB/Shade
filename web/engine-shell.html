@@ -17,12 +17,13 @@ const launchOptions = (() => {
 })();
 var Module = {
  shadeNative: launchOptions.native,
+ shadeDrought: !launchOptions.native && new URLSearchParams(location.search).get('scenario') !== 'village',
  shadeDecodeTextures: new URLSearchParams(location.search).get('textures') === 'decoded',
  canvas: document.getElementById('canvas'),
  arguments: ['-g','/game','--start-level',launchOptions.level,'-l','stdout'],
  print: line => { const log=document.getElementById('output'); log.value+=line+'\n';log.scrollTop=log.scrollHeight; },
  printErr: line => Module.print(line),
- setStatus: text => { if(text) document.getElementById('status').textContent=text; if(text==='Running...'){for(const id of ['village','closeup','villager'])document.getElementById(id).disabled=Module.shadeNative;if(Module.mobileControls)Module.mobileControls.ready();} },
+ setStatus: text => { if(text) document.getElementById('status').textContent=text; if(text==='Running...'){for(const id of ['village','closeup','villager'])document.getElementById(id).disabled=Module.shadeNative || Module.shadeDrought;if(Module.mobileControls)Module.mobileControls.ready();} },
  onAbort: reason => Module.shadeStop ? Module.shadeStop('Engine stopped: '+reason) : Module.setStatus('Engine stopped: '+reason),
  onExit: code => Module.setStatus('Engine exited ('+code+'). See log below.'),
  preRun: [function() {
@@ -88,9 +89,9 @@ window.addEventListener('unhandledrejection', event=>Module.setStatus('Engine er
 document.getElementById('village').onclick=()=>{if(Module._shade_village_view)Module._shade_village_view(0);Module.canvas.focus();};
 document.getElementById('closeup').onclick=()=>{if(Module._shade_village_view)Module._shade_village_view(1);Module.canvas.focus();};
 document.getElementById('villager').onclick=()=>{if(Module._shade_villager_view)Module._shade_villager_view();Module.canvas.focus();};
-if(Module.shadeNative)for(const id of ['village','closeup','villager'])document.getElementById(id).hidden=true;
+if(Module.shadeNative || Module.shadeDrought)for(const id of ['village','closeup','villager'])document.getElementById(id).hidden=true;
 Module.canvas.width=1280;Module.canvas.height=720;
 </script>
-<script src="mobile-controls.js"></script><script src="gameplay.js"></script>
+<script src="mobile-controls.js"></script><script src="gameplay.js"></script><script src="drought-model.js"></script><script src="drought.js"></script>
 {{{ SCRIPT }}}
 </body></html>

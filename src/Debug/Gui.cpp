@@ -260,7 +260,7 @@ bool Gui::Loop() noexcept
 		window->WindowUpdate();
 	}
 	NewFrame();
-	if (ShowMenu())
+	if (!Locator::config::value().hidePlayerHand && ShowMenu())
 	{
 		// Exit option selected
 		return true;

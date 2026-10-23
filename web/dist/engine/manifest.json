@@ -1,27 +1,35 @@
 {
-  "source_revision": "5680a6468e0471bf79fedf0e82b82188aaad0e2d",
+  "source_revision": "fe35e5a25623a4a4b76fc3916455d081373815a9",
   "engine": "openblack-webgl2",
   "original_assets_bundled": true,
   "files": {
     "openblack.html": {
-      "bytes": 10030,
-      "sha256": "dd7aa1900101441480c3e8b217ad76daed80dcd8ae031d9abd23ee346d51e6f7"
+      "bytes": 10243,
+      "sha256": "c0edaae2e785d794253a0d44184909e01eafdbc853a04663ae9a2f6eb4b75f53"
     },
     "openblack.js": {
-      "bytes": 278728,
-      "sha256": "b9545a9532555eaf2f1cd68172ee5ec9780ee896d53c61c2b2d6f11abd8c4913"
+      "bytes": 279009,
+      "sha256": "ff00f07a9a8f9054d9fff0891eaf733550667e7920b89952fdfca28994213eb7"
     },
     "openblack.wasm": {
-      "bytes": 3853615,
-      "sha256": "681c4b501f39940854a09f7fbd4644632f1bfc70c22934c24df72ba9dcadcfa2"
+      "bytes": 3874905,
+      "sha256": "d4d0994a759290eeb0c6b59abe0dc80b08244207dfe995159fc07d735b30097a"
     },
     "mobile-controls.js": {
       "bytes": 4295,
       "sha256": "9124212f8f96e5005855b4cdc5261c3adf8e19bbd3f738cd03c0ffa4dd2c1778"
     },
     "gameplay.js": {
-      "bytes": 10180,
-      "sha256": "4541e608c50a181741219a63626ccdb1ad3577fdd2acaaa3b56f40bc2ec2fdd9"
+      "bytes": 10214,
+      "sha256": "cf6d3536051e4a4a156e8c41eb038ac3528825f855ac4126fe1072b1b92d0abc"
+    },
+    "drought-model.js": {
+      "bytes": 6538,
+      "sha256": "d2804a63e10d179a14c7de70e2338e07aa13d09f5b1f1d9950f2735a58200804"
+    },
+    "drought.js": {
+      "bytes": 10403,
+      "sha256": "1ca65eedbca90a769d8d4bbba6168dc0a6b52aec2f8c3855493c52c8c0b7dc83"
     }
   }
 }

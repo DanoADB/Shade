@@ -26,6 +26,7 @@
 #include "ECS/Components/Tree.h"
 #include "ECS/Components/PlayerGiftReaction.h"
 #include "ECS/Components/Villager.h"
+#include "ECS/Components/ScenarioActivity.h"
 #include "ECS/Components/WallHug.h"
 #include "ECS/Registry.h"
 #include "ECS/Systems/HandSystemInterface.h"
@@ -145,7 +146,8 @@ void RenderingSystem::PrepareDrawUploadUniforms(bool drawBoundingBox)
 		    _renderContext.instanceUniforms[idx] = modelMatrix;
             if (const auto* villager = registry.TryGet<const Villager>(entity))
             {
-                const bool moving = registry.AnyOf<MoveStateLinearTag, MoveStateOrbitTag, MoveStateExitCircleTag,
+                const auto* scenario=registry.TryGet<ScenarioActivity>(entity);
+                const bool moving = (scenario && scenario->moving) || registry.AnyOf<MoveStateLinearTag, MoveStateOrbitTag, MoveStateExitCircleTag,
                                                    MoveStateStepThroughTag>(entity);
                 const auto walk = villager->sex == Villager::Sex::FEMALE ? AnimId::PWalkWoman : AnimId::PWalkMan;
                 _renderContext.instanceAnimations[idx] = {moving ? walk : AnimId::PStand,

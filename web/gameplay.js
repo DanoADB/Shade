@@ -1,5 +1,6 @@
 (function () {
   'use strict';
+  if(Module.shadeDrought)return;
   const panel = document.createElement('section');
   panel.id = 'gameplay';
   panel.hidden = true;
