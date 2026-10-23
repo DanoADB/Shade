@@ -21,6 +21,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "3D/LandBlock.h"
 #include "3D/LandIslandInterface.h"
+#include "3D/SkyInterface.h"
 #include "Camera/Camera.h"
 #include "Graphics/Mesh.h"
 #include "Locator.h"
@@ -37,7 +38,7 @@
 namespace openblack::graphics
 {
 
-// Browser terrain and rest-pose scene models. Water, terrain morphing, and animation playback remain pending.
+// WebGL2 backend for the shared engine scene and original assets.
 class RendererWebGl final: public RendererInterface
 {
 public:
@@ -133,14 +134,40 @@ void main() {
     outputColor=vec4(color.rgb*shade,color.a);
 })";
         renderer->_objectProgram=CompileProgram(objectVertex,objectFragment);
-        if (!renderer->_program || !renderer->_objectProgram) return nullptr;
+        const char* skyVertex=R"(#version 300 es
+layout(location=0) in vec3 position;
+layout(location=1) in vec2 texcoord;
+uniform mat4 viewProjection;
+out vec2 uv;
+void main(){gl_Position=viewProjection*vec4(position,1.0);uv=texcoord;}
+)";
+        const char* skyFragment=R"(#version 300 es
+precision highp float;
+precision highp sampler2DArray;
+in vec2 uv;
+uniform sampler2DArray skies;
+uniform vec2 skyData;
+out vec4 outputColor;
+void main(){
+    vec2 value=clamp(skyData,vec2(0.0),vec2(2.0));
+    vec2 a=floor(value),b=min(a+1.0,vec2(2.0)),t=fract(value);
+    vec4 aa=texture(skies,vec3(uv,a.x+3.0*a.y));
+    vec4 ab=texture(skies,vec3(uv,b.x+3.0*a.y));
+    vec4 ba=texture(skies,vec3(uv,a.x+3.0*b.y));
+    vec4 bb=texture(skies,vec3(uv,b.x+3.0*b.y));
+    outputColor=mix(mix(aa,ba,t.y),mix(ab,bb,t.y),t.x);
+}
+)";
+        renderer->_skyProgram=CompileProgram(skyVertex,skyFragment);
+        if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram) return nullptr;
         glGenVertexArrays(1,&renderer->_vao);
-        emscripten_log(EM_LOG_CONSOLE,"Shade WebGL2 terrain renderer initialized (original materials; rest-pose models)");
+        emscripten_log(EM_LOG_CONSOLE,"Shade WebGL2 renderer initialized (original terrain, models, animations and sky)");
         return renderer;
     }
     ~RendererWebGl() noexcept override {
         if (_program) glDeleteProgram(_program);
         if (_objectProgram) glDeleteProgram(_objectProgram);
+        if (_skyProgram) glDeleteProgram(_skyProgram);
         if (_vao) glDeleteVertexArrays(1,&_vao);
         if (_context > 0) emscripten_webgl_destroy_context(_context);
     }
@@ -155,6 +182,8 @@ void main() {
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         if (!Locator::terrainSystem::has_value()) return;
         glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDisable(GL_CULL_FACE);
+        glBindVertexArray(_vao);
+        if(desc.drawSky && Locator::skySystem::has_value())DrawSky(*desc.camera);
         glUseProgram(_program); glBindVertexArray(_vao);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY,static_cast<GLuint>(Locator::terrainSystem::value().GetAlbedoArray().handle.id));
@@ -336,6 +365,28 @@ void main() {
 	}
 
 private:
+    void DrawSky(const Camera& camera) const noexcept {
+        const auto& sky=Locator::skySystem::value();
+        if(!sky.GetTexture().handle.id || sky.GetMesh().GetSubMeshes().empty())return;
+        const auto& geometry=sky.GetMesh().GetSubMeshes()[0]->GetMesh();
+        const auto& vertices=geometry.GetVertexBuffer();
+        const auto matrix=camera.GetViewProjectionMatrix(Camera::Projection::Normal);
+        glUseProgram(_skyProgram);glDepthMask(GL_FALSE);glDisable(GL_BLEND);glDisable(GL_DEPTH_TEST);
+        glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D_ARRAY,sky.GetTexture().handle.id);
+        glUniform1i(glGetUniformLocation(_skyProgram,"skies"),0);
+        glUniform2f(glGetUniformLocation(_skyProgram,"skyData"),sky.GetCurrentSkyType(),Locator::config::value().skyAlignment+1.0f);
+        glUniformMatrix4fv(glGetUniformLocation(_skyProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
+        glBindBuffer(GL_ARRAY_BUFFER,vertices.handle.id);
+        for(GLuint i=2;i<7;++i)glDisableVertexAttribArray(i);
+        glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,vertices.strideBytes,nullptr);
+        glEnableVertexAttribArray(1);glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,vertices.strideBytes,reinterpret_cast<void*>(12));
+        if(geometry.IsIndexed()) {
+            const auto& indices=geometry.GetIndexBuffer();glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indices.handle.id);
+            glDrawElements(GL_TRIANGLES,indices.count,indices.type==IndexBuffer::Type::Uint16?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT,nullptr);
+        }else glDrawArrays(GL_TRIANGLES,0,vertices.vertexCount);
+        glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);
+        if(!_skyReported){emscripten_log(EM_LOG_CONSOLE,"Original sky: %u texture layers, %u vertices; GL error 0x%x",sky.GetTexture().numLayers,vertices.vertexCount,glGetError());_skyReported=true;}
+    }
     static GLuint CompileProgram(const char* vertex,const char* fragment) noexcept {
         GLuint program=glCreateProgram();
         const char* sources[2]={vertex,fragment};
@@ -408,9 +459,9 @@ private:
         }
     }
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE _context {};
-    GLuint _program {}, _objectProgram {}, _vao {};
+    GLuint _program {}, _objectProgram {}, _skyProgram {}, _vao {};
 	bool _reported {}, _modelsReported {};
-    mutable bool _objectErrorReported {}, _animationReported {};
+    mutable bool _objectErrorReported {}, _animationReported {}, _skyReported {};
 	bool _debug {};
 	bool _profile {};
 };
