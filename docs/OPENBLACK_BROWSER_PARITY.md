@@ -4,7 +4,7 @@ Target: the implemented behavior of the native OpenBlack checkout in Shade, not 
 
 | Area | Browser status | Remaining acceptance work |
 |---|---|---|
-| Original data and story islands | Land1–Land5 and LandT loaded in browser; isolated native startup available | Demo2, clean-profile startup and broader scene comparisons |
+| Original data and story islands | Land1–Land5, LandT and demo2 loaded in browser; isolated native startup available | Clean-profile startup and broader scene comparisons |
 | Terrain materials | Native bump/detail, shore alpha and footprint passes implemented | Broader native pixel/scene comparison |
 | Village, trees, original hand | Original models, native lighting, terrain deformation and sway implemented | Wider model/material coverage and native visual comparison |
 | Packed villager animations | Implemented | Broader clip coverage and walking verification; native currently uses rest poses |
@@ -16,7 +16,7 @@ Target: the implemented behavior of the native OpenBlack checkout in Shade, not 
 | Sprites | Native billboard/additive pass; Citadel lamp glow disappears/reappears with native Sprites toggle | Bookmark cases and native visual comparison |
 | Audio | Original cow bank reached Playing with advancing progress through native UI | Audible/spatial quality and more devices/tracks |
 | Simulation and script VM | Shared code runs | Compare supported native commands and timing on multiple scenes |
-| Input | Basic camera/hand and touch verified | Native hotkeys, focus/capture, full interaction comparison |
+| Input | Camera/hand, touch, P pause, arrow movement and Ctrl+1 / 1 bookmark save/flight verified | Wider hotkeys, focus/capture and full interaction comparison |
 | Storage | Shade task checkpoint works; native SAVE_GAME_IN_SLOT remains a source stub | Further native-supported file-write paths; no full world-save claim |
 | Browser lifecycle | Quit and explicit graphics recovery verified; resize implemented | Memory/frame-time, clean profile and cross-device tests |
 | Deployment | Packaged engine pushed | Verify latest hosted artifacts and another device |
@@ -73,3 +73,10 @@ The WebGL renderer now uses original BC1/BC2/BC3 blocks when WEBGL_compressed_te
 ## Single-channel texture parity
 
 R8 source textures now upload as GL_R8 rather than expanded grayscale RGBA. This matches native single-channel sampling for original height, terrain bump/detail and ocean alpha maps, avoids temporary expansion, and preserves byte-aligned upload handling for odd widths. Browser Land1 reported 69 R8 uploads totaling 4,180,357 bytes instead of 16,721,428 expanded bytes. Original terrain, shore, water and reflection rendered without warnings/errors. WASM and launch/gameplay/mobile regression checks passed; package refreshed. Keyboard P started the shared simulation and the native overlay showed advancing turns; arrow-right moved the camera. Ctrl+1 created the original animated bookmark sprite. Bookmark flight completion remains under verification.
+
+
+## Original demo startup fix and keyboard checks
+
+The original demo2 script places START_CAMERA_POS before LOAD_LANDSCAPE. Both the Windows executable and WASM aborted because coordinate conversion accessed an absent terrain service. Script loading now retains early camera tokens until the new landscape loads, so coordinates also use the correct island when switching maps. Camera-only console snippets still execute against the current terrain at the end of the snippet. Six native camera tests passed (one pre-existing test remains disabled), including a new test that removes the terrain service before loading and a console-only regression. Windows demo2 ran 600 frames and exited zero; the browser displayed the original temple, villagers, trees, ocean and terrain on fresh startup and after switching Land1 → demo2. No new console errors appeared after the fix; the browser log retained the earlier reproduced abort. Original assets were not modified. WASM/native builds and all three JS regression suites passed.
+
+The P key started simulation with advancing turns; arrow-right moved the camera, Ctrl+1 displayed its animated bookmark, and 1 flew back to the saved origin. Broader camera comparisons remain open. Railway had deployed the R8 texture package (manifest source 0b92e218) before the demo fix was pushed; deployment of this latest fix must still be checked.

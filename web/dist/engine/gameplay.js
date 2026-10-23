@@ -111,7 +111,7 @@
   Module.shadeMapChanged = () => {
     islandChanged = true;panel.hidden = true;marker.hidden = true;
     for(const id of ['village','closeup','villager'])document.getElementById(id).disabled = true;
-    document.getElementById('status').textContent = 'Island loaded · use OpenBlack menus · reload to return to the Shade task';
+    document.getElementById('status').textContent = Module.shadeNative ? 'Island loaded · original OpenBlack mode' : 'Island loaded · use OpenBlack menus · reload to return to the Shade task';
   };
   Module.shadeStop = reason => {
     islandChanged = true;panel.hidden = true;marker.hidden = true;

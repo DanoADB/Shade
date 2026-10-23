@@ -104,3 +104,21 @@ TEST_F(SetCameraPos, DISABLED_setCameraFourGods)
 	LoadSceneWithCameraPos({0.0f, 0.0f}, {3159.89f, 1934.44f});
 	ExpectCameraPos({3159.89f, 26.7025127f, 1934.44f});
 }
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): external macro
+TEST_F(SetCameraPos, cameraBeforeLandscape)
+{
+	// Match first startup, with no previous island available to resolve heights.
+	openblack::Locator::terrainSystem::reset();
+	LoadTestScene("START_CAMERA_POS(\"1788.40,2710.00\")\n"
+	              "LOAD_LANDSCAPE(\".\\Data\\Landscape\\Land1.lnd\")\n");
+	ExpectCameraPos({1833.1592f, 55.512512f, 2601.9094f});
+}
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): external macro
+TEST_F(SetCameraPos, cameraOnlyConsoleSnippet)
+{
+	LoadSceneWithCameraPos({0.0f, 0.0f}, {0.0f, 0.0f});
+	LoadTestScene("START_CAMERA_POS(\"1788.40,2710.00\")\n");
+	ExpectCameraPos({1833.1592f, 55.512512f, 2601.9094f});
+}

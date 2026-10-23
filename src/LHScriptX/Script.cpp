@@ -27,6 +27,8 @@ Script::Script() = default;
 void Script::Load(const std::string& source)
 {
 	Lexer lexer(source);
+	bool landscapeLoaded = false;
+	std::vector<std::vector<Token>> pendingCameras;
 
 	const Token* token = this->PeekToken(lexer);
 	while (!token->IsEOF())
@@ -78,11 +80,29 @@ void Script::Load(const std::string& source)
 			// move token to whatever is after ')'
 			this->AdvanceToken(lexer);
 
-			RunCommand(identifier, args);
+			// Released demo scripts can put START_CAMERA_POS before LOAD_LANDSCAPE.
+			// Keep the coordinate tokens until the new terrain can supply their height,
+			// including when switching from a previously loaded island.
+			if (identifier == "START_CAMERA_POS" && !landscapeLoaded)
+			{
+				pendingCameras.push_back(std::move(args));
+			}
+			else
+			{
+				RunCommand(identifier, args);
+				if (identifier == "LOAD_LANDSCAPE")
+				{
+					landscapeLoaded = true;
+					for (const auto& camera : pendingCameras) RunCommand("START_CAMERA_POS", camera);
+					pendingCameras.clear();
+				}
+			}
 		}
 
 		this->AdvanceToken(lexer);
 	}
+	// Console snippets may only move the camera on the current landscape.
+	for (const auto& camera : pendingCameras) RunCommand("START_CAMERA_POS", camera);
 }
 
 bool Script::IsCommand(const std::string& identifier) const
