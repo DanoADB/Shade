@@ -254,7 +254,11 @@ void MeshViewer::Draw() noexcept
 	}
 	ImGui::Columns(1);
 
+#ifdef __EMSCRIPTEN__
+    ImGui::Image(static_cast<ImTextureID>(_frameBuffer->colorAttachment.id),ImVec2(512,512),ImVec2(0,1),ImVec2(1,0));
+#else
 	ImGui::Image(static_cast<ImTextureID>(_frameBuffer->colorAttachment.id), ImVec2(512, 512));
+#endif
 
 	ImGui::EndChild();
 

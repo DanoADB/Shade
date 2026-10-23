@@ -32,6 +32,9 @@
 #include "ECS/Systems/RenderingSystemInterface.h"
 #include "Resources/ResourcesInterface.h"
 #include "Debug/DebugGuiInterface.h"
+#include "ECS/Registry.h"
+#include "ECS/Components/Sprite.h"
+#include "ECS/Components/Transform.h"
 
 #if !defined(LOCATOR_IMPLEMENTATIONS)
 #error "Locator interface implementations should only be included in Locator.cpp, use interface instead."
@@ -167,8 +170,8 @@ uniform float skyType;
 uniform bool vegetation;
 out vec4 outputColor;
 void main() {
-    vec4 color=textured ? texture(diffuse,uv) : vec4(0.7,0.65,0.5,1.0);
-    if(color.a<alphaCutoff) discard;
+    vec4 color=textured ? texture(diffuse,uv) : vec4(1.0);
+    if(color.a<=alphaCutoff) discard;
     float brightness=skyType/2.0;
     float ambient=vegetation?brightness*0.25+0.75:brightness*0.25+0.25;
     vec3 lightDirection=normalize(vec3(-4000.0,1300.0,-1435.0)-worldPosition);
@@ -249,9 +252,51 @@ out vec4 outputColor;
 void main(){outputColor=texture(diffuse,uv);}
 )";
         renderer->_footprintProgram=CompileProgram(footprintVertex,footprintFragment);
-        if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram || !renderer->_waterProgram || !renderer->_footprintProgram) return nullptr;
+        const char* lineVertex=R"(#version 300 es
+layout(location=0) in vec4 position;
+layout(location=1) in vec4 color;
+uniform mat4 viewProjection;
+uniform mat4 model;
+out vec4 tint;
+void main(){gl_Position=viewProjection*model*position;tint=color;}
+)";
+        const char* lineFragment=R"(#version 300 es
+precision highp float;
+in vec4 tint;
+out vec4 outputColor;
+void main(){outputColor=tint;}
+)";
+        renderer->_lineProgram=CompileProgram(lineVertex,lineFragment);
+        const char* spriteVertex=R"(#version 300 es
+layout(location=0) in vec2 position;
+uniform mat4 viewProjection;
+uniform mat4 model;
+uniform mat4 inverseView;
+uniform vec4 sampleRect;
+out vec2 uv;
+void main(){
+    vec2 unitUv=vec2(position.x*0.5+0.5,0.5-position.y*0.5);
+    vec3 translation=(model*vec4(0.0,0.0,0.0,1.0)).xyz;
+    vec3 scaled=(model*vec4(position,0.0,0.0)).xyz;
+    vec3 billboard=(inverseView*vec4(scaled,0.0)).xyz;
+    gl_Position=viewProjection*vec4(translation+billboard,1.0);
+    uv=unitUv*sampleRect.xy+sampleRect.zw;
+}
+)";
+        const char* spriteFragment=R"(#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D diffuse;
+uniform vec4 tint;
+out vec4 outputColor;
+void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
+)";
+        renderer->_spriteProgram=CompileProgram(spriteVertex,spriteFragment);
+        if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram || !renderer->_waterProgram || !renderer->_footprintProgram || !renderer->_lineProgram || !renderer->_spriteProgram) return nullptr;
         glGenVertexArrays(1,&renderer->_vao);
         glGenFramebuffers(1,&renderer->_framebuffer);
+        const float quad[]={-1,-1,1,-1,1,1,-1,-1,1,1,-1,1};
+        glGenBuffers(1,&renderer->_spriteBuffer);glBindBuffer(GL_ARRAY_BUFFER,renderer->_spriteBuffer);glBufferData(GL_ARRAY_BUFFER,sizeof(quad),quad,GL_STATIC_DRAW);
         emscripten_log(EM_LOG_CONSOLE,"Shade WebGL2 renderer initialized (original terrain, models, animations and sky)");
         return renderer;
     }
@@ -261,6 +306,9 @@ void main(){outputColor=texture(diffuse,uv);}
         if (_skyProgram) glDeleteProgram(_skyProgram);
         if (_waterProgram) glDeleteProgram(_waterProgram);
         if (_footprintProgram)glDeleteProgram(_footprintProgram);
+        if (_lineProgram)glDeleteProgram(_lineProgram);
+        if (_spriteProgram)glDeleteProgram(_spriteProgram);
+        if (_spriteBuffer)glDeleteBuffers(1,&_spriteBuffer);
         if (_framebuffer)glDeleteFramebuffers(1,&_framebuffer);
         if (_vao) glDeleteVertexArrays(1,&_vao);
         if (_context > 0) emscripten_webgl_destroy_context(_context);
@@ -358,6 +406,16 @@ void main(){outputColor=texture(diffuse,uv);}
             for(uint32_t i=0;i<instances.count;++i)
                 DrawObject(*mesh,context.treeInstanceData.at(instances.offset+i).modelMatrix,AnimId::Invalid,0,false,&context.treeInstanceData.at(instances.offset+i).swayParams);
         }
+        if(desc.viewId==RenderPass::Main){
+            if(desc.drawBoundingBoxes && context.hasBoundingBoxes){
+                const auto count=context.instanceUniforms.size()/2;
+                for(size_t i=0;i<count;++i)DrawLines(context.boundingBox.get(),matrix,context.instanceUniforms.at(count+i));
+                for(uint32_t i=0;i<context.treeInstanceCount;++i)DrawLines(context.boundingBox.get(),matrix,context.treeInstanceData.at(context.treeInstanceCount+i).modelMatrix);
+            }
+            if(desc.drawFootpaths)DrawLines(context.footpaths.get(),matrix,glm::mat4(1));
+            if(desc.drawStreams)DrawLines(context.streams.get(),matrix,glm::mat4(1));
+        }
+        if(desc.drawSprites)DrawSprites(desc);
         glDepthMask(GL_TRUE);glDisable(GL_BLEND);
         glBindVertexArray(0);
         if (!_modelsReported) {
@@ -373,13 +431,43 @@ void main(){outputColor=texture(diffuse,uv);}
             _modelsReported=true;
         }
     }
-	void Frame() noexcept final {glBindFramebuffer(GL_FRAMEBUFFER,0);if(Locator::debugGui::has_value())Locator::debugGui::value().Draw(nullptr,nullptr);}
-	void RequestScreenshot(const std::filesystem::path&) noexcept final {}
+	void Frame() noexcept final {
+        glBindFramebuffer(GL_FRAMEBUFFER,0);if(Locator::debugGui::has_value())Locator::debugGui::value().Draw(nullptr,nullptr);
+        if(!_screenshotName.empty()){
+            EM_ASM({const name=UTF8ToString($0);Module.canvas.toBlob(blob=>{
+                if(!blob){console.error('Screenshot encoding failed');return;}
+                const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;link.click();
+                setTimeout(()=>URL.revokeObjectURL(url),1000);
+            },'image/png');},_screenshotName.c_str());_screenshotName.clear();
+        }
+    }
+	void RequestScreenshot(const std::filesystem::path& path) noexcept final {
+        if(path.extension()==".png")_screenshotName=path.filename().string();
+        else emscripten_log(EM_LOG_ERROR,"Screenshot output must be a PNG file");
+    }
 	[[nodiscard]] bool GetDebug() const noexcept final { return _debug; }
 	void SetDebug(bool value) noexcept final { _debug = value; }
 	[[nodiscard]] bool GetProfile() const noexcept final { return _profile; }
 	void SetProfile(bool value) noexcept final { _profile = value; }
-	void DrawMesh(const L3DMesh&, const L3DMeshSubmitDesc&, uint8_t) const noexcept final {}
+	void DrawMesh(const L3DMesh& mesh,const L3DMeshSubmitDesc& desc,uint8_t subMesh) const noexcept final {
+        if(!desc.camera || !desc.frameBuffer || !BindTarget(*desc.frameBuffer))return;
+        glViewport(0,0,desc.frameBuffer->resolution.x,desc.frameBuffer->resolution.y);
+        glDisable(GL_SCISSOR_TEST);glDisable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LESS);glDepthMask(GL_TRUE);
+        glClearColor(0x27/255.0f,0x46/255.0f,0x59/255.0f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(_vao);glUseProgram(_objectProgram);
+        const auto matrix=desc.camera->GetViewProjectionMatrix(Camera::Projection::Normal);
+        glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
+        glUniform1f(glGetUniformLocation(_objectProgram,"skyType"),Locator::skySystem::value().GetCurrentSkyType());
+        const auto& island=Locator::terrainSystem::value();const auto extent=island.GetExtent();const auto bounds=glm::vec4(extent.minimum,extent.maximum);
+        glUniform4fv(glGetUniformLocation(_objectProgram,"islandExtent"),1,glm::value_ptr(bounds));
+        glActiveTexture(GL_TEXTURE4);glBindTexture(GL_TEXTURE_2D,island.GetHeightMap().handle.id);
+        glUniform1i(glGetUniformLocation(_objectProgram,"heightMap"),4);glActiveTexture(GL_TEXTURE0);
+        const auto model=(!mesh.IsBoned() && desc.modelMatrices && desc.matrixCount)?desc.modelMatrices[0]:glm::mat4(1);
+        DrawObject(mesh,model,AnimId::Invalid,0,desc.morphWithTerrain,nullptr,subMesh,desc.drawAll,
+                   mesh.IsBoned()?desc.modelMatrices:nullptr,mesh.IsBoned()?desc.matrixCount:0);
+        if(desc.boundingBox){const auto box=mesh.GetBoundingBox();DrawLines(desc.boundingBox,matrix,model*glm::scale(glm::translate(glm::mat4(1),box.Center()),box.Size()));}
+        glDepthMask(GL_TRUE);glDisable(GL_BLEND);glBindFramebuffer(GL_FRAMEBUFFER,0);glBindVertexArray(0);
+    }
 
 	[[nodiscard]] VertexBufferUniquePtr CreateVertexBuffer(std::string name, std::span<const uint8_t> memory,
 	                                                       VertexDecl decl) noexcept final
@@ -507,6 +595,38 @@ void main(){outputColor=texture(diffuse,uv);}
 	}
 
 private:
+    void DrawLines(const Mesh* mesh,const glm::mat4& projection,const glm::mat4& model) const noexcept {
+        if(!mesh || !mesh->HasVertexBuffer())return;
+        glUseProgram(_lineProgram);glDepthMask(GL_FALSE);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glUniformMatrix4fv(glGetUniformLocation(_lineProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(_lineProgram,"model"),1,GL_FALSE,glm::value_ptr(model));
+        const auto& vertices=mesh->GetVertexBuffer();glBindBuffer(GL_ARRAY_BUFFER,vertices.handle.id);
+        for(GLuint i=2;i<7;++i)glDisableVertexAttribArray(i);
+        glEnableVertexAttribArray(0);glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,vertices.strideBytes,nullptr);
+        glEnableVertexAttribArray(1);glVertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,vertices.strideBytes,reinterpret_cast<void*>(16));
+        if(mesh->IsIndexed()){const auto& indices=mesh->GetIndexBuffer();glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indices.handle.id);glDrawElements(GL_LINES,indices.count,indices.type==IndexBuffer::Type::Uint16?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT,nullptr);}
+        else glDrawArrays(GL_LINES,0,vertices.vertexCount);
+    }
+    void DrawSprites(const DrawSceneDesc& desc) const noexcept {
+        glUseProgram(_spriteProgram);glDepthMask(GL_FALSE);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE);
+        const auto projection=desc.camera->GetViewProjectionMatrix(Camera::Projection::Normal);
+        const auto inverse=glm::inverse(desc.camera->GetViewMatrix(Camera::Interpolation::Current));
+        glUniformMatrix4fv(glGetUniformLocation(_spriteProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(_spriteProgram,"inverseView"),1,GL_FALSE,glm::value_ptr(inverse));
+        glBindBuffer(GL_ARRAY_BUFFER,_spriteBuffer);
+        for(GLuint i=1;i<7;++i)glDisableVertexAttribArray(i);
+        glEnableVertexAttribArray(0);glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,2*sizeof(float),nullptr);
+        glActiveTexture(GL_TEXTURE0);glUniform1i(glGetUniformLocation(_spriteProgram,"diffuse"),0);
+        desc.entities.Each<const ecs::components::Sprite,const ecs::components::Transform>([&](const auto& sprite,const auto& transform){
+            if(!sprite.texture.id)return;
+            auto model=glm::translate(glm::mat4(1),transform.position)*glm::mat4(transform.rotation);
+            model=glm::scale(model,transform.scale);const auto rectangle=glm::vec4(sprite.uvExtent,sprite.uvMin);
+            glUniformMatrix4fv(glGetUniformLocation(_spriteProgram,"model"),1,GL_FALSE,glm::value_ptr(model));
+            glUniform4fv(glGetUniformLocation(_spriteProgram,"sampleRect"),1,glm::value_ptr(rectangle));
+            glUniform4fv(glGetUniformLocation(_spriteProgram,"tint"),1,glm::value_ptr(sprite.tint));
+            glBindTexture(GL_TEXTURE_2D,sprite.texture.id);glDrawArrays(GL_TRIANGLES,0,6);
+        });
+    }
     void DrawFootprints() const noexcept {
         const auto& island=Locator::terrainSystem::value();
         const auto& target=island.GetFootprintFramebuffer();
@@ -609,12 +729,13 @@ private:
             emscripten_log(EM_LOG_ERROR,"WebGL program: %s",log);glDeleteProgram(program);return 0; }
         return program;
     }
-    void DrawObject(const L3DMesh& mesh,const glm::mat4& model, AnimId clip=AnimId::Invalid, uint32_t time=0,bool morph=false,const glm::vec4* sway=nullptr) const noexcept {
+    void DrawObject(const L3DMesh& mesh,const glm::mat4& model, AnimId clip=AnimId::Invalid, uint32_t time=0,bool morph=false,const glm::vec4* sway=nullptr,uint8_t subMesh=255,bool drawAll=false,const glm::mat4* boneOverride=nullptr,uint8_t overrideCount=0) const noexcept {
         glUniform1i(glGetUniformLocation(_objectProgram,"morphWithTerrain"),morph);
         glUniform1i(glGetUniformLocation(_objectProgram,"vegetation"),sway!=nullptr);
         if(sway)glUniform4fv(glGetUniformLocation(_objectProgram,"sway"),1,glm::value_ptr(*sway));
         const auto* palette=&mesh.GetBoneMatrices();
         std::vector<glm::mat4> posed;
+        if(boneOverride && overrideCount){posed.assign(boneOverride,boneOverride+overrideCount);palette=&posed;}
         auto& animations=Locator::resources::value().GetAnimations();
         const auto clipId=resources::HashIdentifier(clip);
         if (mesh.IsBoned() && clip >= AnimId::BatEraticglide && animations.Contains(clipId)) {
@@ -635,9 +756,11 @@ private:
         glUniform1i(glGetUniformLocation(_objectProgram,"boneCount"),boneCount);
         if(boneCount) glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"bones[0]"),boneCount,GL_FALSE,glm::value_ptr(bones[0]));
         const auto& textures=Locator::resources::value().GetTextures();
+        uint8_t subIndex=0;
         for(const auto& sub:mesh.GetSubMeshes()) {
+            if(subMesh!=255 && subIndex++!=subMesh)continue;
             const auto flags=sub->GetFlags();
-            if(flags.isPhysics || flags.status!=0 || (flags.lodMask&1)==0) continue;
+            if(!drawAll && (flags.isPhysics || flags.status!=0 || (flags.lodMask&1)==0)) continue;
             const auto& geometry=sub->GetMesh();
             const auto& vertices=geometry.GetVertexBuffer();const auto& indices=geometry.GetIndexBuffer();
             glBindBuffer(GL_ARRAY_BUFFER,vertices.handle.id);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indices.handle.id);
@@ -653,7 +776,7 @@ private:
                 glBindTexture(GL_TEXTURE_2D,texture ? texture->handle.id : 0);
                 glUniform1i(glGetUniformLocation(_objectProgram,"textured"),texture && texture->handle.id);
                 glUniform1i(glGetUniformLocation(_objectProgram,"diffuse"),0);
-                glUniform1f(glGetUniformLocation(_objectProgram,"alphaCutoff"),primitive.thresholdAlpha ? primitive.alphaCutoutThreshold : 0.01f);
+                glUniform1f(glGetUniformLocation(_objectProgram,"alphaCutoff"),primitive.thresholdAlpha ? primitive.alphaCutoutThreshold : 0.0f);
                 glDepthMask(primitive.depthWrite ? GL_TRUE : GL_FALSE);
                 if(primitive.blend!=L3DSubMesh::Primitive::BlendMode::Disabled) {
                     glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,primitive.blend==L3DSubMesh::Primitive::BlendMode::Additive ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA);
@@ -667,7 +790,8 @@ private:
         }
     }
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE _context {};
-    GLuint _program {}, _objectProgram {}, _skyProgram {}, _waterProgram {}, _footprintProgram {}, _vao {}, _framebuffer {};
+    GLuint _program {}, _objectProgram {}, _skyProgram {}, _waterProgram {}, _footprintProgram {}, _lineProgram {}, _spriteProgram {}, _spriteBuffer {}, _vao {}, _framebuffer {};
+    std::string _screenshotName;
 	bool _reported {}, _modelsReported {};
     mutable bool _objectErrorReported {}, _animationReported {}, _skyReported {}, _waterReported {}, _footprintsReported {};
 	bool _debug {};

@@ -60,7 +60,11 @@ void LandIsland::Draw() noexcept
 		const auto height = frameBuffer.resolution.y;
 		ImGui::Text("Resolution: %ux%u", width, height);
 		const float scaling = 512.0f / static_cast<float>(width);
+#ifdef __EMSCRIPTEN__
+        ImGui::Image(static_cast<ImTextureID>(frameBuffer.colorAttachment.id),ImVec2(width*scaling,height*scaling),ImVec2(0,1),ImVec2(1,0));
+#else
 		ImGui::Image(static_cast<ImTextureID>(frameBuffer.colorAttachment.id), ImVec2(width * scaling, height * scaling));
+#endif
 		ImGui::TreePop();
 	}
 }

@@ -10,10 +10,10 @@ Target: the implemented behavior of the native OpenBlack checkout in Shade, not 
 | Packed villager animations | Implemented | Broader clip coverage and walking verification; native currently uses rest poses |
 | Sky | Original dome and nine-layer shader implemented; day/night verified | Broader alignment and scene comparisons |
 | Ocean | Original water textures and reflected-scene pass implemented; Land2 coast verified | Native visual comparison across time/alignment and views |
-| Native debug UI | Native menus restored with Dear ImGui WebGL2 backend | Offscreen inspector rendering still needs render targets |
-| Offscreen render targets | RGBA8/depth-stencil targets implemented; reflection running | Footprint and inspector draw passes |
-| Lines and overlays | Missing | Bounding boxes, paths, streams and debug entities |
-| Sprites | Missing | Native sprite pass and blend behavior |
+| Native debug UI | Native menus, mesh preview and image tools restored | Wider inspector and keyboard coverage |
+| Offscreen render targets | Reflection, footprints and mesh preview implemented | More scene/format and resize coverage |
+| Lines and overlays | Scene/mesh bounding boxes, paths and streams verified | Compare remaining overlays against native |
+| Sprites | Native billboard/additive shader and entity pass implemented | Visual verification of glow/bookmark cases |
 | Audio | Compiles | Browser gesture unlock, real playback and spatial controls |
 | Simulation and script VM | Shared code runs | Compare supported native commands and timing on multiple scenes |
 | Input | Basic camera/hand and touch verified | Native hotkeys, focus/capture, full interaction comparison |
@@ -36,3 +36,7 @@ Replaced empty browser framebuffer handles with sampled RGBA8 targets and option
 ## Terrain and vegetation checkpoint
 
 Ported the native terrain bump/detail shading, original ground decals, height-map deformation for marked buildings/fields, tree anchoring/sway and native object/vegetation day-night lighting equations. Ground decals use an orthographic RGBA target with OpenGL texture orientation. Browser Land1 rendered 1,485 decal instances into a 3,584 by 3,328 target with GL error zero. Original building surrounds and conforming crop fields are visible; the World menu dims terrain and buildings at night. No console errors appeared. Larger scene/material comparisons and performance profiling remain required.
+
+## Inspectors, overlays and capture checkpoint
+
+Implemented offscreen DrawMesh with native submesh filtering and caller-provided bone palettes, plus bounding-box drawing. ImGui framebuffer previews use OpenGL UV orientation. The native MeshPack Viewer displayed the original dummy mesh texture and red box, while scene bounding boxes, footpaths and streams rendered through native view toggles. Added the native billboard sprite/tint pass; specific sprite visuals remain unverified. Capture now downloads a PNG from the completed engine canvas; the resulting screenshot.png was opened and visually checked. HTML task controls are outside the engine canvas and are not part of that native capture. WASM and native regression builds passed; no browser console errors appeared during these checks.
