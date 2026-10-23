@@ -19,8 +19,11 @@
 #include "3D/LandIslandInterface.h"
 #include "3D/SkyInterface.h"
 #include "3D/CreatureAnimationBank.h"
+#include "3D/TerrainRoutes.h"
+#include "ECS/Components/Tree.h"
 #include "PackFile.h"
 #include "L3DFile.h"
+#include "LNDFile.h"
 #include "FileSystem/FileSystemInterface.h"
 #include "ECS/Components/Fixed.h"
 #include "ECS/Components/Mesh.h"
@@ -35,6 +38,9 @@ class DroughtScene {
     entt::entity creature{entt::null},water{entt::null};
     glm::vec3 home{},well{},spring{};float scale{1},floorOffset{};int lastDelivery{};std::vector<entt::entity> workers;std::vector<glm::vec3> workerHomes;
     std::vector<entt::entity> props,workerProps;std::vector<glm::vec3> channelPath;
+    std::array<std::vector<glm::vec3>,2> godRoutes;
+    std::vector<std::array<std::vector<glm::vec3>,3>> workerRoutes;
+    int routeMask=0;
     animation::CreatureAnimationBank motion;
     std::vector<std::pair<uint32_t,glm::vec3>> contacts;float standingLowest=0;
     std::vector<glm::mat4> pose,transitionPose;std::string motionName;
@@ -42,7 +48,14 @@ class DroughtScene {
     float walkedDistance=0,stepDistance=0,previousAnimateTime=0;
     int previousPhase=0,animationDeliveries=0;bool motionPaused=false,motionLoop=true;
     std::chrono::steady_clock::time_point motionClock;
-    glm::vec3 Ground(glm::vec3 p)const {p.y=Locator::terrainSystem::value().GetHeightAt({p.x,p.z});return p;}
+    glm::vec3 Ground(glm::vec3 p)const {
+        auto& terrain=Locator::terrainSystem::value();const float cell=LandIslandInterface::k_CellSize;
+        const int x=int(std::floor(p.x/cell)),z=int(std::floor(p.z/cell));
+        if(x<0||z<0||x>=511||z>=511){p.y=0;return p;}
+        const auto& a=terrain.GetCell(glm::u16vec2(x,z));
+        p.y=navigation::TriangleHeight(a.altitude,terrain.GetCell(glm::u16vec2(x+1,z)).altitude,terrain.GetCell(glm::u16vec2(x,z+1)).altitude,terrain.GetCell(glm::u16vec2(x+1,z+1)).altitude,a.properties.split,p.x/cell-x,p.z/cell-z)*LandIslandInterface::k_HeightUnit;
+        return p;
+    }
     glm::vec3 Clearing(glm::vec3 desired)const {
         glm::vec3 best=Ground(desired);float bestScore=-1e10f;
         for(int x=-24;x<=24;x+=4)for(int z=-24;z<=24;z+=4){
@@ -58,6 +71,38 @@ class DroughtScene {
         auto box=meshes.Handle(key)->GetBoundingBox();float s=height/std::max(.01f,box.Size().y);
         auto e=registry.Create();registry.Assign<ecs::components::Mesh>(e,key,int8_t(-1),int8_t(-1));
         registry.Assign<ecs::components::Transform>(e,position+glm::vec3(0,-box.minima.y*s,0),glm::mat3(1),glm::vec3(s));props.push_back(e);return e;
+    }
+    bool BuildRoutes(){
+        using namespace ecs::components;auto& registry=Locator::entitiesRegistry::value();
+        std::vector<navigation::Obstacle> obstacles;
+        registry.Each<const Fixed>([&](entt::entity e,const Fixed& fixed){
+            if(glm::distance(fixed.boundingCenter,glm::vec2(home.x,home.z))>210+fixed.boundingRadius)return;
+            // Tree Fixed bounds include the canopy. Navigation protects the scaled trunk.
+            const float radius=registry.TryGet<Tree>(e)?std::max(.5f,fixed.boundingRadius*.22f):fixed.boundingRadius;
+            obstacles.push_back({fixed.boundingCenter,radius});
+        });
+        auto height=[&](float x,float z){return Ground({x,0,z}).y;};
+        auto origin=glm::vec2(home.x,home.z)-glm::vec2(160);
+        navigation::TerrainRoutes large(origin,161,2,{3.2f,.6f},height,obstacles);
+        glm::vec2 safeHome;if(!large.Nearest({home.x,home.z},safeHome,28))return false;
+        home=Ground({safeHome.x,0,safeHome.y});
+        emscripten_log(EM_LOG_CONSOLE,"Navigation sites: home %.1f/%.1f, well %.1f/%.1f, spring %.1f/%.1f",home.x,home.z,well.x,well.z,spring.x,spring.z);
+        godRoutes[0]=large.Find(safeHome,{well.x,well.z},16);
+        godRoutes[1]=large.Find(safeHome,{spring.x,spring.z},24);
+        if(!godRoutes[1].empty())spring=godRoutes[1].back();
+        channelPath=godRoutes[1];std::reverse(channelPath.begin(),channelPath.end());
+        navigation::TerrainRoutes small(origin,161,2,{.65f,.65f},height,obstacles);
+        workerRoutes.resize(workers.size());routeMask=0;
+        if(!godRoutes[0].empty())routeMask|=1;
+        if(!godRoutes[1].empty())routeMask|=2|4;
+        for(size_t i=0;i<workers.size();++i){
+            glm::vec2 start;if(!small.Nearest({workerHomes[i].x,workerHomes[i].z},start,16))continue;
+            workerHomes[i]=Ground({start.x,0,start.y});registry.Get<Transform>(workers[i]).position=workerHomes[i];
+            const std::array<glm::vec3,3> goals{well,home+glm::vec3(12,0,8),spring};
+            for(int job=0;job<3;++job){workerRoutes[i][job]=small.Find(start,{goals[job].x,goals[job].z});if(!workerRoutes[i][job].empty())routeMask|=1<<(3+i*3+job);}
+        }
+        emscripten_log(EM_LOG_CONSOLE,"Drought navigation: %zu obstacles; route mask %d, creature waypoints %zu/%zu",obstacles.size(),routeMask,godRoutes[0].size(),godRoutes[1].size());
+        return true;
     }
     struct GodChoice {CreatureType type;const char* bank;const char* mesh;};
     static constexpr std::array<GodChoice,3> gods{{
@@ -89,6 +134,7 @@ class DroughtScene {
         return 1;
     }
 public:
+    int Routes()const{return routeMask;}
     void RestoreCounters(int deliveries){lastDelivery=animationDeliveries=deliveries;happyUntil=wakeUntil=castUntil=0;}
     int SwapGod(int selection){
         auto& registry=Locator::entitiesRegistry::value();
@@ -113,6 +159,7 @@ public:
         if(phase==0&&time<happyUntil){next="happy";tick=(time-happyUntil)*1000+motion.Duration("happy");loop=false;}
         if(time<wakeUntil){next="end_sleep";tick=(time-wakeUntil)*1000+motion.Duration("end_sleep");loop=false;}
         if(time<castUntil){next="end_cast";tick=(time-castUntil)*1000+motion.Duration("end_cast");loop=false;}
+        if(next=="walk"&&stepDistance<.001f)next="stand";
         if(next=="walk"){
             const float stride=std::max(.1f,motion.TravelDistance("walk")*scale),duration=float(motion.Duration("walk"));
             tick=walkedDistance/stride*duration;
@@ -145,7 +192,7 @@ public:
         auto& registry=Locator::entitiesRegistry::value();auto e=workers[index];if(!registry.Valid(e))return;
         auto destination=job==0?well:job==1?home+glm::vec3(12,0,8):spring;
         const auto t=std::clamp(progress,0.f,1.f);const auto travel=t<.4f?t/.4f:t>.6f?(1-t)/.4f:1;
-        auto& transform=registry.Get<Transform>(e);auto next=Ground(glm::mix(workerHomes[index],destination,travel));auto delta=next-transform.position;delta.y=0;
+        auto& transform=registry.Get<Transform>(e);auto next=Ground(navigation::Along(workerRoutes[index][std::clamp(job,0,2)],travel,workerHomes[index]));auto delta=next-transform.position;delta.y=0;
         if(glm::length(delta)>.01f)transform.rotation=glm::mat3(glm::eulerAngleY(std::atan2(delta.x,delta.z)));
         transform.position=next;
         if(size_t(index)<workerProps.size()&&registry.Valid(workerProps[index])){
@@ -163,7 +210,7 @@ public:
         using namespace ecs::components;
         if(!Locator::entitiesRegistry::has_value()||!Locator::terrainSystem::has_value())return 0;
         auto& registry=Locator::entitiesRegistry::value();auto& meshes=Locator::resources::value().GetMeshes();
-        if(reset){for(auto e:props)if(registry.Valid(e))registry.Destroy(e);props.clear();workerProps.clear();channelPath.clear();droughtGround.clear();++droughtGroundRevision;
+        if(reset){for(auto e:props)if(registry.Valid(e))registry.Destroy(e);props.clear();workerProps.clear();workerRoutes.clear();for(auto& route:godRoutes)route.clear();routeMask=0;channelPath.clear();droughtGround.clear();++droughtGroundRevision;
             if(registry.Valid(creature))registry.Destroy(creature);if(registry.Valid(water))registry.Destroy(water);for(size_t i=0;i<workers.size();++i)if(registry.Valid(workers[i])){registry.Get<Transform>(workers[i]).position=workerHomes[i];registry.Remove<ScenarioActivity>(workers[i]);}
             workers.clear();workerHomes.clear();creature=water=entt::null;lastDelivery=0;animationDeliveries=0;previousPhase=0;happyUntil=wakeUntil=castUntil=0;pose.clear();transitionPose.clear();motionName.clear();walkedDistance=stepDistance=previousAnimateTime=0;}
         if(creature==entt::null){
@@ -174,7 +221,8 @@ public:
             float best=-1e10f;
             for(int x=24;x<=56;x+=8)for(int z=-24;z<=32;z+=8){auto p=Clearing(home+glm::vec3(x,0,z));float gain=p.y-home.y;float score=-std::abs(gain-8.f)-glm::distance(p,home)*.02f;if(score>best){best=score;spring=p;}}
             for(int i=0;i<=16;++i){float t=i/16.f;channelPath.push_back(Ground(glm::mix(spring,home+glm::vec3(-4,0,3),t)+glm::vec3(std::sin(t*3.14159265f)*4,0,0)));}
-            Prop(MeshId::BuildingEgyptianWell,well+glm::vec3(-4,0,0),4);
+            auto wellProp=Prop(MeshId::BuildingEgyptianWell,well+glm::vec3(-4,0,0),4);
+            if(wellProp!=entt::null)registry.Assign<Fixed>(wellProp,glm::vec2(well.x-4,well.z),2.f);
             for(int i=0;i<6;++i){float a=i*6.2831853f/6;Prop(MeshId::ObjectFlatRockLimeStone,Ground(well+glm::vec3(std::cos(a)*3.6f,0,std::sin(a)*3.6f)),.65f);}
             creature=registry.Create();registry.Assign<Mesh>(creature,id,int8_t(-1),int8_t(-1));registry.Assign<Transform>(creature,home+glm::vec3(0,floorOffset,0),glm::mat3(1),glm::vec3(scale));
             water=registry.Create();registry.Assign<Mesh>(water,resources::HashIdentifier(MeshId::U_Bucket),int8_t(0),int8_t(-1));registry.Assign<Transform>(water,home,glm::mat3(1),glm::vec3(0));
@@ -185,6 +233,7 @@ public:
             });
             std::sort(candidates.begin(),candidates.end());
             for(size_t i=0;i<std::min(size_t(3),candidates.size());++i){workers.push_back(candidates[i].second);workerHomes.push_back(registry.Get<Transform>(workers.back()).position);workerProps.push_back(Prop(MeshId::U_Bucket,workerHomes.back(),.8f));}
+            if(!BuildRoutes()){emscripten_log(EM_LOG_ERROR,"No safe creature clearing found");return -4;}
             emscripten_log(EM_LOG_CONSOLE,"Drought workers: %zu original villagers with autonomous jobs",workers.size());
             Locator::config::value().hidePlayerHand=true;focus=1;
             emscripten_log(EM_LOG_CONSOLE,"Drought creature: original model %s, %zu bones, scale %.3f",mesh->GetDebugName().c_str(),mesh->GetBoneMatrices().size(),scale);
@@ -192,10 +241,11 @@ public:
         if(!registry.Valid(creature))return -2;
         progress=std::clamp(progress,0.f,1.f);auto destination=(phase==1?well:spring);
         const auto travel=(phase==1||phase==2||phase==4)?(progress<.4f?progress/.4f:progress>.6f?(1-progress)/.4f:1):0;
-        auto position=Ground(glm::mix(home,destination,travel));
+        auto position=home;
+        if(phase==1||phase==2)position=Ground(navigation::Along(godRoutes[phase-1],travel,home));
         if(phase==4){
-            if(progress<.2f)position=Ground(glm::mix(home,spring,progress/.2f));
-            else{float t=std::clamp((progress-.2f)/.8f,0.f,1.f)*(channelPath.size()-1);size_t i=std::min(size_t(t),channelPath.size()-2);position=Ground(glm::mix(channelPath[i],channelPath[i+1],t-float(i)));}
+            if(progress<.2f)position=Ground(navigation::Along(godRoutes[1],progress/.2f,home));
+            else position=Ground(navigation::Along(channelPath,(progress-.2f)/.8f,home));
         }
         auto& transform=registry.Get<Transform>(creature);
         auto delta=position-transform.position;delta.y=0;stepDistance=glm::length(delta);walkedDistance+=stepDistance;
@@ -208,7 +258,10 @@ public:
             registry.Each<const Villager,const Transform>([&](entt::entity e,const Villager&,const Transform& t){if(glm::distance(t.position,home)<80)registry.AssignOrReplace<PlayerGiftReaction>(e,now,now+std::chrono::seconds(4));});lastDelivery=deliveries;
         }
         if(focus){auto target=focus==2?position:focus==3?well:focus==4?spring:home;
-            if(focus>=6&&size_t(focus-6)<workers.size()&&registry.Valid(workers[focus-6]))target=registry.Get<Transform>(workers[focus-6]).position;Locator::camera::value().SetFocus(target+glm::vec3(0,4,0)).SetOrigin(target+(focus>=2?glm::vec3(18,20,-28):glm::vec3(32,48,-65)));}
+            if(focus>=6&&size_t(focus-6)<workers.size()&&registry.Valid(workers[focus-6]))target=registry.Get<Transform>(workers[focus-6]).position;auto look=target+glm::vec3(0,4,0);auto eye=target+(focus>=2?glm::vec3(18,20,-28):glm::vec3(32,48,-65));
+            // Keep the follow camera and its sightline above nearby hills.
+            for(int i=0;i<16;++i){float t=i/16.f;auto p=glm::mix(eye,look,t);eye.y=std::max(eye.y,(Ground(p).y+2.5f-t*look.y)/(1-t));}
+            Locator::camera::value().SetFocus(look).SetOrigin(eye);}
         std::array<float,18> anchors{};const auto size=Locator::windowing::value().GetSize();
         for(int i=0;i<6;++i){auto p=i==0?home:i==1?well:spring;
             if(i>=3){if(size_t(i-3)>=workers.size()||!registry.Valid(workers[i-3]))continue;p=registry.Get<Transform>(workers[i-3]).position;}
@@ -223,6 +276,7 @@ public:
 
 namespace openblack::browser {
 static DroughtScene& Scene(){static DroughtScene scene;return scene;}
+int DroughtRoutes(){return Scene().Routes();}
 int RunDrought(int phase,float progress,int deliveries,int focus,int reset){return Scene().Run(phase,progress,deliveries,focus,reset);}
 void RestoreDroughtCounters(int deliveries){Scene().RestoreCounters(deliveries);}
 int SwapDroughtGod(int selection){return Scene().SwapGod(selection);}

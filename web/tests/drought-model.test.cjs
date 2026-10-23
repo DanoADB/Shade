@@ -14,3 +14,10 @@ const h=new Drought();h.water=10;h.phase="rest";h.duration=1000;h.step(23);asser
 
 const unguided=new Drought();unguided.step(180);assert.equal(unguided.outcome,'lost','Default scenario needs the player’s influence');
 const guided=new Drought();for(let i=0;i<720;i++){if(guided.cooldown===0)guided.influence(guided.spring?'care':'explore');if(guided.last&&!guided.feedback)guided.influence('praise');guided.step(.25);}assert.equal(guided.outcome,'won');assert(guided.channel,'Teaching discovery and care creates a sustainable ending');
+
+const blocked=new Drought();blocked.phase='care';blocked.duration=18;blocked.elapsed=17.9;blocked.workers.forEach(w=>w.progress=.9);
+const noRoutes={care:false,explore:false,channel:false,workers:blocked.workers.map(()=>({'hauling water':false,'tending crops':false,'protecting trees':false}))};
+blocked.step(1,noRoutes);assert.equal(blocked.deliveries,0);assert.equal(blocked.elapsed,17.9);assert(blocked.workers.every(w=>w.cycles===0&&w.progress===.9),'Blocked workers cannot earn rewards');
+blocked.phase='idle';blocked.elapsed=0;blocked.duration=3;blocked.step(3,noRoutes);assert.equal(blocked.phase,'rest','Choose a reachable activity instead of walking through a blocked route');
+const reassigned=new Drought();reassigned.step(.25,{workers:[{'hauling water':false,'tending crops':true}]});assert.equal(reassigned.workers[0].job,'tending crops');assert(reassigned.workers[0].progress>0);
+console.log('Unreachable trips pause without rewards; idle actors choose safe alternative work.');

@@ -12,6 +12,7 @@ int SwapDroughtGod(int selection);
 void AnimateDroughtCreature(int phase,float progress,float time,int paused,int deliveries);
 const std::vector<glm::mat4>& SampleDroughtCreature();
 void UpdateDroughtWorld(int discovered,int channel,float progress,float time);
+int DroughtRoutes();
 int RunDrought(int phase,float progress,int deliveries,int focus,int reset);
 void RunDroughtWorker(int index,int job,float progress);
 }

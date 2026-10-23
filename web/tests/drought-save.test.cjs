@@ -26,11 +26,12 @@ for(const mutate of [s=>s.version=99,s=>s.god=5,s=>s.state.seed=-1,s=>s.state.ti
 }
 for(const text of ['null','{','[]','x'.repeat(16001)])assert.throws(()=>decodeSave(text));
 const polluted=JSON.parse(JSON.stringify(valid));polluted.state.step='bad';polluted.state.__proto__={polluted:true};assert.equal(typeof decodeSave(JSON.stringify(polluted)).model.step,'function');
-function boot(storage,failGod=false){
+function boot(storage,failGod=false,mask=null){
  const elements=new Map(),handlers={},windowHandlers={},calls=[],world=[],workers=[],motions=[];let tick,now=0;
  const nudges=[];const get=id=>{if(!elements.has(id)){const classes=new Set();elements.set(id,{textContent:'',value:'',disabled:false,hidden:false,style:{},dataset:{},classList:{toggle(){},contains(){return false;}},append(){},setAttribute(){},querySelector(){return get('body');},querySelectorAll(){return nudges;},addEventListener(name,fn){this[name]=fn;}});}return elements.get(id);};
  const document={hidden:false,head:get('head'),createElement(){return {...get('template')};},getElementById:get,querySelector(){return get('header');},querySelectorAll(){return [];},addEventListener(n,f){handlers[n]=f;}};
  const Module={shadeDrought:true,canvas:get('canvas'),_shade_drought(...args){calls.push(args);return 1;},_shade_drought_restore(deliveries){calls.push(['restore',deliveries]);},_shade_drought_god(god){calls.push(['god',god]);return failGod?0:1;},_shade_drought_world(...args){world.push(args);},_shade_drought_worker(...args){workers.push(args);},_shade_drought_animate(...args){motions.push(args);}};
+ if(mask!==null)Module._shade_drought_routes=()=>mask;
  vm.runInNewContext(fs.readFileSync(require.resolve('../drought.js'),'utf8'),{Module,document,window:{addEventListener(n,f){windowHandlers[n]=f;}},localStorage:storage,ShadeDrought:rules,performance:{now:()=>now},setInterval(fn){tick=fn;},location:{reload(){}},Math});
  get('status').textContent='Running...';tick();
  return {get,document,handlers,windowHandlers,calls,world,workers,motions,step(ms){now+=ms;tick();}};
@@ -49,3 +50,6 @@ ui=boot({getItem(){throw Error('blocked');},setItem(){throw Error('quota');}});u
 text=null;ui=boot(storage);ui.get('drought-god').value='2';ui.get('drought-god').onchange();assert.equal(decodeSave(text).god,2);ui.document.hidden=true;ui.handlers.visibilitychange();assert.doesNotThrow(()=>decodeSave(text));ui.windowHandlers.pagehide();
 const unsafe=JSON.parse(encodeSave(new Drought(),0,false));unsafe.state.events[0].text='<img src=x onerror=evil()>';text=JSON.stringify(unsafe);ui=boot(storage);assert(!ui.get('drought-story').innerHTML.includes('<img'));
 console.log('Drought save schema, deterministic continuation, reward boundaries, god/worker/learning restore, paused reload, reset, corrupt/blocked storage and safe history rendering passed.');
+
+text=encodeSave(checkpoint,1,true);ui=boot(storage,false,0);assert.match(ui.get('drought-navigation').textContent,/waiting for a safe route/);ui.get('drought-pause').onclick();ui.step(1000);ui.get('drought-save').onclick();assert.equal(decodeSave(text).model.elapsed,13);assert.equal(decodeSave(text).model.workers[0].progress,.9);
+console.log('Restored blocked routes freeze action and worker progress without changing the save format.');

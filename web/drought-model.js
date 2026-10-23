@@ -18,13 +18,14 @@
       this.urge=kind;this.cooldown=5;this.bond=clamp(this.bond-2);this.note({care:'You stir compassion. It will weigh the village’s need.',explore:'You kindle curiosity about water beyond the village.',rest:'You offer calm. It may choose to recover.',rain:'You share a dream of rain. The creature must choose to answer.'}[kind]);return true;
     }
     canRain(){return this.belief>=44&&this.confidence>=48&&this.energy>=45&&this.rain===0;}
-    choose(){
+    choose(routes={}){
       let chosen;
       if(this.energy<18)chosen='rest';
       else if(this.urge==='rain'&&this.canRain())chosen='rain';
-      else if(this.spring&&!this.channel&&this.deliveries>=2&&this.belief>=28&&this.urge==='care')chosen='channel';
+      else if(this.spring&&!this.channel&&this.deliveries>=2&&this.belief>=28&&this.urge==='care'&&routes.channel!==false)chosen='channel';
       else {
         const weights={care:this.habits.care*(this.water<40?2:1),explore:this.habits.explore*(this.spring?.25:1),rest:this.habits.rest*(this.energy<45?2:.4)};
+        for(const key of ['care','explore'])if(routes[key]===false)weights[key]=0;
         if(weights[this.urge]!==undefined)weights[this.urge]*=1+this.bond/35;
         let pick=this.random()*Object.values(weights).reduce((a,b)=>a+b,0);
         chosen=Object.keys(weights).find(k=>(pick-=weights[k])<=0)||'care';
@@ -45,13 +46,19 @@
       else if(act==='rain'){this.rain=65;this.water=clamp(this.water+42);this.crops=clamp(this.crops+14);this.forest=clamp(this.forest+12);this.energy=clamp(this.energy-40);this.note('Rain answers the creature. Villagers now expect their god to bring it again.');}
       this.phase='idle';this.elapsed=0;this.duration=3;
     }
-    step(dt){
+    step(dt,routes={}){
       if(!Number.isFinite(dt)||dt<0)return;
       while(dt>0&&!this.outcome){const n=Math.min(dt,.25);dt-=n;this.time+=n;this.cooldown=Math.max(0,this.cooldown-n);this.rain=Math.max(0,this.rain-n);
         this.water=clamp(this.water+n*(-.9+(this.channel?.72:0)+(this.rain>0?.65:0)));
         this.crops=clamp(this.crops+n*(this.water<25?-.35:this.channel||this.rain>0?.16:-.045));
         this.forest=clamp(this.forest+n*(this.rain>0?.12:this.channel?.025:-.09));
-        for(const worker of this.workers){
+        for(const [index,worker] of this.workers.entries()){
+          const reachable=routes.workers&&routes.workers[index];
+          if(reachable&&reachable[worker.job]===false){
+            if(worker.progress>0)continue;
+            const alternative=['hauling water','tending crops','protecting trees'].find(job=>reachable[job]!==false);
+            if(!alternative)continue;worker.job=alternative;
+          }
           worker.progress+=n/22;
           if(worker.progress>=1){worker.progress-=1;worker.cycles++;
             if(worker.job==='hauling water')this.water=clamp(this.water+(this.channel?6:2));
@@ -60,7 +67,8 @@
             worker.job=this.water<24?'hauling water':this.crops<38?'tending crops':this.forest<40?'protecting trees':{ 'Water gatherer':'hauling water',Farmer:'tending crops',Forester:'protecting trees'}[worker.name];
           }
         }
-        this.elapsed+=n;if(this.elapsed>=this.duration){if(this.phase==='idle')this.choose();else this.finish();}
+        if(routes[this.phase]!==false)this.elapsed+=n;
+        if(this.elapsed>=this.duration&&routes[this.phase]!==false){if(this.phase==='idle')this.choose(routes);else this.finish();}
         if(this.crops<=5){this.outcome='lost';this.note('The harvest fails. Try another way of teaching your creature.');}
         else if(this.time>=180){this.outcome=this.water>=25&&this.crops>=40&&this.forest>=35?'won':'lost';this.note(this.outcome==='won'?(this.channel?'The village survives through shared water. Its god taught resilience.':'The village survives. Its faith rests on the creature’s continuing care.'):'The village cannot sustain its water supply. Its god needs a different lesson.');}
       }

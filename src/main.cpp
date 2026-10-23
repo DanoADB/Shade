@@ -347,6 +347,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int shade_villager_view()
 
 #ifdef __EMSCRIPTEN__
 #include "BrowserDrought.h"
+extern "C" EMSCRIPTEN_KEEPALIVE int shade_drought_routes(){return openblack::browser::DroughtRoutes();}
 extern "C" EMSCRIPTEN_KEEPALIVE void shade_drought_weather(float dry,float rain){openblack::browser::droughtDryness=std::clamp(dry,0.f,1.f);openblack::browser::droughtRain=std::clamp(rain,0.f,1.f);}
 extern "C" EMSCRIPTEN_KEEPALIVE void shade_drought_restore(int deliveries){openblack::browser::RestoreDroughtCounters(deliveries);}
 extern "C" EMSCRIPTEN_KEEPALIVE int shade_drought_god(int selection){return openblack::browser::SwapDroughtGod(selection);}
