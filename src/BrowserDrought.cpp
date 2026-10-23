@@ -199,7 +199,8 @@ public:
         }
         auto& transform=registry.Get<Transform>(creature);
         auto delta=position-transform.position;delta.y=0;stepDistance=glm::length(delta);walkedDistance+=stepDistance;
-        if(glm::length(delta)>.01f)transform.rotation=glm::mat3(glm::eulerAngleY(std::atan2(delta.x,delta.z)));
+        // Original creature walk clips travel along local -Z; face that axis into the route.
+        if(glm::length(delta)>.01f)transform.rotation=glm::mat3(glm::eulerAngleY(std::atan2(-delta.x,-delta.z)));
         transform.position=position+glm::vec3(0,floorOffset,0);
         auto& carried=registry.Get<Transform>(water);carried.position=position+transform.rotation*glm::vec3(3,4,1);carried.scale=glm::vec3(phase==1&&progress>.6f&&progress<.98f?1.2f:0);
         if(deliveries>lastDelivery){
