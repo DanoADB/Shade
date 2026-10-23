@@ -7,6 +7,9 @@
  * openblack is licensed under the GNU General Public License version 3.
  *******************************************************************************/
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 #include <glm/ext/vector_float2.hpp>
 #define LOCATOR_IMPLEMENTATIONS
 
@@ -33,8 +36,13 @@ GameActionMap::GameActionMap()
 	_mouseWheelBinding[0] = BindableActionMap::ZOOM_IN;
 	_mouseWheelBinding[1] = BindableActionMap::ZOOM_OUT;
 	_keyboardBindings.emplace(SDL_SCANCODE_T, BindableActionMap::TALK);
-	_keyboardBindings.emplace(SDL_SCANCODE_LCTRL, BindableActionMap::ZOOM_ON);
-	_keyboardBindings.emplace(SDL_SCANCODE_RCTRL, BindableActionMap::ZOOM_ON);
+#ifdef __EMSCRIPTEN__
+    if(!EM_ASM_INT({return !!Module.shadeDrought;}))
+#endif
+    {
+        _keyboardBindings.emplace(SDL_SCANCODE_LCTRL, BindableActionMap::ZOOM_ON);
+        _keyboardBindings.emplace(SDL_SCANCODE_RCTRL, BindableActionMap::ZOOM_ON);
+    }
 	_keyboardBindings.emplace(SDL_SCANCODE_LEFT, BindableActionMap::MOVE_LEFT);
 	_keyboardBindings.emplace(SDL_SCANCODE_RIGHT, BindableActionMap::MOVE_RIGHT);
 	_keyboardBindings.emplace(SDL_SCANCODE_UP, BindableActionMap::MOVE_FORWARDS);
@@ -210,6 +218,11 @@ void GameActionMap::Frame()
 
 void GameActionMap::ProcessEvent(const SDL_Event& event)
 {
+#ifdef __EMSCRIPTEN__
+    // Keep mouse motion for the hand, but do not start a camera drag on a resource grab.
+    if(event.type==SDL_EVENT_MOUSE_BUTTON_DOWN&&event.button.button==SDL_BUTTON_LEFT&&
+       EM_ASM_INT({return !!Module.shadeDrought && !!Module.shadePointerGrab;}))return;
+#endif
 	if (event.type == SDL_EVENT_KEY_DOWN)
 	{
 		if (_keyboardModBindings.contains(event.key.scancode) &&

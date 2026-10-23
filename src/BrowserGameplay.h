@@ -30,6 +30,8 @@ using namespace ecs::components;
 class Gameplay
 {
     entt::entity selected{entt::null}, bundle{entt::null}, source{entt::null};
+    struct Dropped {bool food;entt::entity source;};
+    std::map<entt::entity,Dropped> dropped;
     std::unordered_set<uint32_t> gathered;
     std::map<uint32_t,uint32_t> savedStocks;
     std::unordered_set<uint32_t> harvested;
@@ -47,6 +49,7 @@ class Gameplay
     {
         const auto& registry=Locator::entitiesRegistry::value();
         if (!registry.Valid(entity) || !registry.AllOf<Transform>(entity)) return 0;
+        if(dropped.contains(entity))return 5;
         if (registry.AllOf<Field>(entity)) return 4;
         if (registry.AllOf<Tree>(entity)) return 1;
         if (registry.AllOf<Abode>(entity)) return 2;
@@ -66,7 +69,7 @@ class Gameplay
     glm::vec3 Anchor(entt::entity entity) const
     {
         return Locator::entitiesRegistry::value().Get<Transform>(entity).position+
-               glm::vec3(0,Kind(entity)==3 ? 1.0f : 3.0f,0);
+               glm::vec3(0,Kind(entity)==5?.3f:Kind(entity)==3 ? 1.0f : 3.0f,0);
     }
     bool Outdoors(const glm::vec3& position) const
     {
@@ -109,7 +112,7 @@ class Gameplay
     {
         selected=entt::null;
         if(!std::isfinite(x)||!std::isfinite(y)||x<0||x>1||y<0||y>1)return;
-        float best=44.0f*44.0f;
+        float best=44.0f*44.0f;bool foundDropped=false;
         auto& camera=Locator::camera::value();
         const auto size=Locator::windowing::value().GetSize();
         Locator::entitiesRegistry::value().Each<const Transform>([&](entt::entity entity,const Transform&) {
@@ -118,7 +121,8 @@ class Gameplay
             if(!camera.ProjectWorldToScreen(Anchor(entity),{0,0,size.x,size.y},projected))return;
             const glm::vec2 delta=glm::vec2(projected)-glm::vec2(x*size.x,y*size.y);
             const auto distance=glm::dot(delta,delta);
-            if(distance<best){best=distance;selected=entity;}
+            const bool pile=Kind(entity)==5&&distance<24.f*24.f;
+            if((pile&&!foundDropped)||((pile==foundDropped)&&distance<best)){best=distance;selected=entity;foundDropped=pile;}
         });
         message=Kind(selected) ? "Object selected." : "No object here. Tap a tree, villager or building, or use Find.";
     }
@@ -190,6 +194,22 @@ public:
         registry.Each<const PlayerGiftReaction>([&](entt::entity entity,const auto& reaction){if(now>=reaction.until)expired.push_back(entity);});
         for(const auto entity:expired)registry.Remove<PlayerGiftReaction>(entity);
         if(bundle!=entt::null && !registry.Valid(bundle)){bundle=entt::null;source=entt::null;}
+        for(auto it=dropped.begin();it!=dropped.end();)if(!registry.Valid(it->first))it=dropped.erase(it);else ++it;
+        if(action==11){
+            if(bundle!=entt::null){message="Release or return the held resource first.";action=0;}
+            else{Select(x,y);if(Kind(selected)==5){auto item=dropped.at(selected);bundle=selected;source=item.source;carryingFood=item.food;dropped.erase(selected);message=carryingFood?"Holding food. Release Ctrl or the left mouse button to drop.":"Holding wood. Release Ctrl or the left mouse button to drop.";action=0;}else action=2;}
+        }
+        if(action==10&&bundle!=entt::null){
+            if(!std::isfinite(x)||!std::isfinite(y)||x<0||x>1||y<0||y>1)action=7;
+            else{
+                Select(x,y);const int target=Kind(selected);
+                if(target==2||(carryingFood&&target==3&&registry.Get<Villager>(selected).hunger>0))action=3;
+                else{auto hit=Locator::camera::value().RaycastScreenCoordToLand({x,y},false);
+                    if(!hit)action=7;
+                    else{registry.Get<Transform>(bundle).position=hit->position+glm::vec3(0,.2f,0);dropped[bundle]={carryingFood,source};bundle=source=entt::null;registry.SetDirty();message="Resource released on the ground. Ctrl + left-click it to pick it up again.";action=0;}
+                }
+            }
+        }
         if(action==1)Select(x,y);
         if(action>=4 && action<=6)Focus(action-3);
         if(action==9)Focus(4);
