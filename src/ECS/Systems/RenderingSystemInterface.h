@@ -10,6 +10,7 @@
 #pragma once
 
 #include <map>
+#include <chrono>
 #include <tuple>
 
 #include <entt/fwd.hpp>
@@ -52,6 +53,7 @@ struct RenderContext
     {
         AnimId clip {AnimId::Invalid};
         uint32_t phase {0};
+        int64_t started {-1}; // Steady-clock milliseconds for an event-triggered clip.
     };
     std::vector<InstanceAnimation> instanceAnimations;
 

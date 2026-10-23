@@ -190,10 +190,12 @@ void main() {
         if (desc.drawEntities) for(const auto& [key,instances]:context.instancedDrawDescs) {
             if(!meshes.Contains(key.meshId)) continue;
             const auto mesh=meshes.Handle(key.meshId);
-            for(uint32_t i=0;i<instances.count;++i)
-                DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),
-                    context.instanceAnimations.at(instances.offset+i).clip,
-                    desc.time+context.instanceAnimations.at(instances.offset+i).phase);
+            for(uint32_t i=0;i<instances.count;++i) {
+                const auto& animation=context.instanceAnimations.at(instances.offset+i);
+                const auto time=animation.started<0 ? desc.time+animation.phase : uint32_t(std::max<int64_t>(0,
+                    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()-animation.started));
+                DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),animation.clip,time);
+            }
         }
         if(desc.drawVegetation) for(const auto& [id,instances]:context.treeInstancedDrawDescs) {
             if(!meshes.Contains(id)) continue;

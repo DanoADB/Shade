@@ -13,7 +13,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build', type=Path, default=ROOT / '.local/wasm-build/bin')
     args = parser.parse_args()
-    names = ('openblack.html', 'openblack.js', 'openblack.wasm', 'mobile-controls.js')
+    names = ('openblack.html', 'openblack.js', 'openblack.wasm', 'mobile-controls.js', 'gameplay.js')
     for name in names:
         if not (args.build / name).is_file():
             parser.error(f'Missing engine artifact: {name}')

@@ -24,6 +24,7 @@
 #include "ECS/Components/Temple.h"
 #include "ECS/Components/Transform.h"
 #include "ECS/Components/Tree.h"
+#include "ECS/Components/PlayerGiftReaction.h"
 #include "ECS/Components/Villager.h"
 #include "ECS/Components/WallHug.h"
 #include "ECS/Registry.h"
@@ -149,6 +150,13 @@ void RenderingSystem::PrepareDrawUploadUniforms(bool drawBoundingBox)
                 const auto walk = villager->sex == Villager::Sex::FEMALE ? AnimId::PWalkWoman : AnimId::PWalkMan;
                 _renderContext.instanceAnimations[idx] = {moving ? walk : AnimId::PStand,
                     static_cast<uint32_t>(entity) * 137u};
+                if (const auto* reaction=registry.TryGet<PlayerGiftReaction>(entity))
+                {
+                    _renderContext.instanceAnimations[idx].clip = villager->sex == Villager::Sex::FEMALE ?
+                        AnimId::PThankYouFemale : AnimId::PThankYou;
+                    _renderContext.instanceAnimations[idx].started = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        reaction->started.time_since_epoch()).count();
+                }
             }
 		    if (drawBoundingBox)
 		    {

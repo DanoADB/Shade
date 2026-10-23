@@ -309,6 +309,20 @@ extern "C" EMSCRIPTEN_KEEPALIVE int shade_resize(int width, int height)
 #include "ECS/Components/Villager.h"
 #include "ECS/Components/Transform.h"
 #include <glm/geometric.hpp>
+#include "BrowserGameplay.h"
+static openblack::browser::Gameplay& BrowserGameplay()
+{
+    static openblack::browser::Gameplay gameplay;
+    return gameplay;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void shade_gameplay(int action,float x,float y)
+{
+    BrowserGameplay().Run(action,x,y);
+}
+extern "C" EMSCRIPTEN_KEEPALIVE int shade_gameplay_restore(int kind,uint32_t id,float x,float y,float z,uint32_t amount)
+{
+    return BrowserGameplay().Restore(kind,id,x,y,z,amount);
+}
 extern "C" EMSCRIPTEN_KEEPALIVE int shade_villager_view()
 {
     using namespace openblack;
