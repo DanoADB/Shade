@@ -10,6 +10,9 @@
 #include "Temple.h"
 
 #include <unordered_map>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 
 #include "3D/TempleInteriorInterface.h"
 #include "Locator.h"
@@ -33,10 +36,16 @@ void TempleInterior::Draw() noexcept
 			if (active)
 			{
 				temple.Activate();
+#ifdef __EMSCRIPTEN__
+                EM_ASM({if(Module.shadeTempleChanged)Module.shadeTempleChanged(true);});
+#endif
 			}
 			else
 			{
 				temple.Deactivate();
+#ifdef __EMSCRIPTEN__
+                EM_ASM({if(Module.shadeTempleChanged)Module.shadeTempleChanged(false);});
+#endif
 			}
 		}
 	}

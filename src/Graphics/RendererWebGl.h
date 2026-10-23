@@ -130,7 +130,7 @@ layout(location=2) in vec3 normal;
 layout(location=3) in ivec2 joint;
 uniform mat4 viewProjection;
 uniform mat4 model;
-uniform mat4 bones[64];
+uniform highp sampler2D bonePalette;
 uniform int boneCount;
 uniform sampler2D heightMap;
 uniform vec4 islandExtent;
@@ -142,7 +142,11 @@ out vec3 worldPosition;
 out vec3 worldNormal;
 void main() {
     mat4 bone=mat4(1.0);
-    if(joint.x>=0 && joint.x<boneCount) bone=bones[joint.x];
+    if(boneCount>0){
+        int index=clamp(joint.x,0,boneCount-1);
+        bone=mat4(texelFetch(bonePalette,ivec2(0,index),0),texelFetch(bonePalette,ivec2(1,index),0),
+                  texelFetch(bonePalette,ivec2(2,index),0),texelFetch(bonePalette,ivec2(3,index),0));
+    }
     vec4 world=model*bone*vec4(position,1.0);
     vec3 base=(model*vec4(0.0,0.0,0.0,1.0)).xyz;
     if(vegetation){
@@ -295,6 +299,12 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram || !renderer->_waterProgram || !renderer->_footprintProgram || !renderer->_lineProgram || !renderer->_spriteProgram) return nullptr;
         glGenVertexArrays(1,&renderer->_vao);
         glGenFramebuffers(1,&renderer->_framebuffer);
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE,&renderer->_maxBoneHeight);
+        const glm::mat4 identity(1);
+        glGenTextures(1,&renderer->_boneTexture);glBindTexture(GL_TEXTURE_2D,renderer->_boneTexture);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA32F,4,1,0,GL_RGBA,GL_FLOAT,glm::value_ptr(identity));
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
         const float quad[]={-1,-1,1,-1,1,1,-1,-1,1,1,-1,1};
         glGenBuffers(1,&renderer->_spriteBuffer);glBindBuffer(GL_ARRAY_BUFFER,renderer->_spriteBuffer);glBufferData(GL_ARRAY_BUFFER,sizeof(quad),quad,GL_STATIC_DRAW);
         emscripten_log(EM_LOG_CONSOLE,"Shade WebGL2 renderer initialized (original terrain, models, animations and sky)");
@@ -309,6 +319,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         if (_lineProgram)glDeleteProgram(_lineProgram);
         if (_spriteProgram)glDeleteProgram(_spriteProgram);
         if (_spriteBuffer)glDeleteBuffers(1,&_spriteBuffer);
+        if (_boneTexture)glDeleteTextures(1,&_boneTexture);
         if (_framebuffer)glDeleteFramebuffers(1,&_framebuffer);
         if (_vao) glDeleteVertexArrays(1,&_vao);
         if (_context > 0) emscripten_webgl_destroy_context(_context);
@@ -392,11 +403,13 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
         const auto& context=Locator::rendereringSystem::value().GetContext();
         const auto& meshes=Locator::resources::value().GetMeshes();
+        const ecs::systems::RenderContext::InstanceAnimation restPose{};
         if (desc.drawEntities) for(const auto& [key,instances]:context.instancedDrawDescs) {
             if(!meshes.Contains(key.meshId)) continue;
             const auto mesh=meshes.Handle(key.meshId);
             for(uint32_t i=0;i<instances.count;++i) {
-                const auto& animation=context.instanceAnimations.at(instances.offset+i);
+                const auto index=instances.offset+i;
+                const auto& animation=index<context.instanceAnimations.size()?context.instanceAnimations[index]:restPose;
                 const auto time=animation.started<0 ? desc.time+animation.phase : uint32_t(std::max<int64_t>(0,
                     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()-animation.started));
                 DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),animation.clip,time,instances.morphWithTerrain);
@@ -753,10 +766,23 @@ private:
         }
         const auto& bones=*palette;
         const auto boneCount=mesh.IsBoned() ? bones.size() : 0;
-        if(boneCount>64) return;
+        if(boneCount>static_cast<size_t>(_maxBoneHeight)){
+            emscripten_log(EM_LOG_ERROR,"Bone palette exceeds device texture limit: %zu",boneCount);return;
+        }
         glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"model"),1,GL_FALSE,glm::value_ptr(model));
         glUniform1i(glGetUniformLocation(_objectProgram,"boneCount"),boneCount);
-        if(boneCount) glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"bones[0]"),boneCount,GL_FALSE,glm::value_ptr(bones[0]));
+        glActiveTexture(GL_TEXTURE5);glBindTexture(GL_TEXTURE_2D,_boneTexture);
+        glUniform1i(glGetUniformLocation(_objectProgram,"bonePalette"),5);
+        if(boneCount){
+            if(boneCount>_boneCapacity){
+                while(_boneCapacity<boneCount)_boneCapacity*=2;
+                _boneCapacity=std::min<unsigned>(_boneCapacity,_maxBoneHeight);
+                glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA32F,4,_boneCapacity,0,GL_RGBA,GL_FLOAT,nullptr);
+            }
+            glTexSubImage2D(GL_TEXTURE_2D,0,0,0,4,boneCount,GL_RGBA,GL_FLOAT,glm::value_ptr(bones[0]));
+            if(!_paletteReported){emscripten_log(EM_LOG_CONSOLE,"Texture bone palette: %zu bones, %u rows; GL error 0x%x",boneCount,_boneCapacity,glGetError());_paletteReported=true;}
+        }
+        glActiveTexture(GL_TEXTURE0);
         const auto& textures=Locator::resources::value().GetTextures();
         uint8_t subIndex=0;
         for(const auto& sub:mesh.GetSubMeshes()) {
@@ -793,9 +819,12 @@ private:
     }
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE _context {};
     GLuint _program {}, _objectProgram {}, _skyProgram {}, _waterProgram {}, _footprintProgram {}, _lineProgram {}, _spriteProgram {}, _spriteBuffer {}, _vao {}, _framebuffer {};
+    GLuint _boneTexture{};
+    GLint _maxBoneHeight{};
+    mutable unsigned _boneCapacity{1};
     std::string _screenshotName;
 	bool _reported {}, _modelsReported {};
-    mutable bool _objectErrorReported {}, _animationReported {}, _skyReported {}, _waterReported {}, _footprintsReported {};
+    mutable bool _objectErrorReported {}, _animationReported {}, _skyReported {}, _waterReported {}, _footprintsReported {}, _paletteReported {};
 	bool _debug {};
 	bool _profile {};
 };

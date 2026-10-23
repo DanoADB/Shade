@@ -1,5 +1,5 @@
 {
-  "source_revision": "c535fd227c3f84706dea6a78801280312ba25562",
+  "source_revision": "5bf8001ec66c8ceb3304da71add81285a267fefb",
   "engine": "openblack-webgl2",
   "original_assets_bundled": true,
   "files": {
@@ -8,20 +8,20 @@
       "sha256": "96aba8ce5b41630671bb448aa0f1549066a115a073fd2b15fdc4095eab3b34ac"
     },
     "openblack.js": {
-      "bytes": 277637,
-      "sha256": "ca5ec18f34fbe04c14b682a6789218aea3444d073c7371a1341a68adeeac16bd"
+      "bytes": 277786,
+      "sha256": "eaf821b57f1294cc1d32856e78fb49faa98de8a3f5ca3b3a3f322cd2bcfd381c"
     },
     "openblack.wasm": {
-      "bytes": 3849519,
-      "sha256": "5879fdc5a28b98945d13d7cd6bc85f2d2d5df4e99318ffdd58677d424076fc81"
+      "bytes": 3850974,
+      "sha256": "0c45934cd849eacb93374121dd522b083b9030b67c9190337f1e6e0d61361f3a"
     },
     "mobile-controls.js": {
       "bytes": 4295,
       "sha256": "9124212f8f96e5005855b4cdc5261c3adf8e19bbd3f738cd03c0ffa4dd2c1778"
     },
     "gameplay.js": {
-      "bytes": 9524,
-      "sha256": "29ce0d4583bd0c81e28f42b886cc68159636fc0be94658edf1afb74781fc32b4"
+      "bytes": 9824,
+      "sha256": "f652d1aeb9c7651b64de5fdaf32190587d62c3d91b9babdf84bf93a6efa282c3"
     }
   }
 }

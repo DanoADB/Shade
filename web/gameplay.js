@@ -100,6 +100,12 @@
   document.addEventListener('visibilitychange', cancel);
   let started = false;
   let islandChanged = false;
+  let templeActive = false;
+  Module.shadeTempleChanged = active => {
+    templeActive = active;
+    panel.hidden = active || islandChanged;marker.hidden = true;
+    for(const id of ['village','closeup','villager'])document.getElementById(id).disabled = active || islandChanged;
+  };
   Module.shadeMapChanged = () => {
     islandChanged = true;panel.hidden = true;marker.hidden = true;
     for(const id of ['village','closeup','villager'])document.getElementById(id).disabled = true;
@@ -127,7 +133,7 @@
     setTimeout(()=>extension.restoreContext(),500);
   };
   setInterval(() => {
-    if (islandChanged || document.getElementById('status').textContent !== 'Running...' || document.hidden) return;
+    if (islandChanged || templeActive || document.getElementById('status').textContent !== 'Running...' || document.hidden) return;
     if (!started) {
       started = true;
       if (Module._shade_village_view) Module._shade_village_view(1);
