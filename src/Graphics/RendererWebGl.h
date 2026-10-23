@@ -22,6 +22,7 @@
 #include "3D/LandBlock.h"
 #include "3D/LandIslandInterface.h"
 #include "3D/SkyInterface.h"
+#include "3D/OceanInterface.h"
 #include "Camera/Camera.h"
 #include "Graphics/Mesh.h"
 #include "Locator.h"
@@ -98,7 +99,7 @@ void main() {
         vec3 b=texture(materials,vec3(uv,float(second[i]))).rgb;
         color+=mix(a,b,blend[i])*weights[i];
     }
-    outputColor=vec4(color*clamp(lighting*2.0,0.5,1.0),1.0);
+    outputColor=vec4(color*clamp(lighting*2.0,0.5,1.0),alpha);
 }
 )";
         renderer->_program=CompileProgram(vertex,fragment);
@@ -160,8 +161,41 @@ void main(){
 }
 )";
         renderer->_skyProgram=CompileProgram(skyVertex,skyFragment);
-        if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram) return nullptr;
+        const char* waterVertex=R"(#version 300 es
+layout(location=0) in vec2 position;
+uniform mat4 viewProjection;
+uniform mat4 view;
+out vec3 uvAndDistance;
+out vec4 reflectionPosition;
+void main(){
+    vec4 world=vec4(position.x,0.0,position.y,1.0);
+    vec4 clip=viewProjection*world;
+    gl_Position=clip;
+    uvAndDistance=vec3(world.xz/500.0,(view*world).z);
+    reflectionPosition=vec4((clip.xy+clip.ww)*0.5,clip.zw);
+}
+)";
+        const char* waterFragment=R"(#version 300 es
+precision highp float;
+in vec3 uvAndDistance;
+in vec4 reflectionPosition;
+uniform sampler2D diffuse;
+uniform sampler2D alphaMap;
+uniform sampler2D reflection;
+uniform float skyType;
+out vec4 outputColor;
+void main(){
+    vec3 color=mix(0.25,1.0,clamp(skyType/2.0,0.0,1.0))*texture(diffuse,uvAndDistance.xy).rgb;
+    vec3 reflected=texture(reflection,reflectionPosition.xy/reflectionPosition.w).rgb;
+    float opacity=texture(alphaMap,uvAndDistance.xy).r;
+    float horizon=clamp(3000.0/max(abs(uvAndDistance.z),0.001),0.0,1.0);
+    outputColor=vec4(mix(reflected,color,opacity*horizon),1.0);
+}
+)";
+        renderer->_waterProgram=CompileProgram(waterVertex,waterFragment);
+        if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram || !renderer->_waterProgram) return nullptr;
         glGenVertexArrays(1,&renderer->_vao);
+        glGenFramebuffers(1,&renderer->_framebuffer);
         emscripten_log(EM_LOG_CONSOLE,"Shade WebGL2 renderer initialized (original terrain, models, animations and sky)");
         return renderer;
     }
@@ -169,23 +203,38 @@ void main(){
         if (_program) glDeleteProgram(_program);
         if (_objectProgram) glDeleteProgram(_objectProgram);
         if (_skyProgram) glDeleteProgram(_skyProgram);
+        if (_waterProgram) glDeleteProgram(_waterProgram);
+        if (_framebuffer)glDeleteFramebuffers(1,&_framebuffer);
         if (_vao) glDeleteVertexArrays(1,&_vao);
         if (_context > 0) emscripten_webgl_destroy_context(_context);
     }
 	[[nodiscard]] void* GetDevice() const noexcept final { return nullptr; }
 	void DrawScene(const DrawSceneDesc& desc) noexcept final {
-        if (desc.viewId != RenderPass::Main || !desc.camera) return;
+        if ((desc.viewId != RenderPass::Main && desc.viewId != RenderPass::Reflection) || !desc.camera) return;
+        if(desc.viewId==RenderPass::Main && desc.drawWater && Locator::oceanSystem::has_value()) {
+            const auto reflectedCamera=desc.camera->Reflect();
+            auto reflected=desc;reflected.camera=reflectedCamera.get();reflected.viewId=RenderPass::Reflection;
+            reflected.drawWater=false;reflected.drawBoundingBoxes=false;
+            reflected.frameBuffer=&Locator::oceanSystem::value().GetReflectionFramebuffer();
+            DrawScene(reflected);
+        }
         int width=0,height=0;
-        emscripten_get_canvas_element_size("#canvas",&width,&height);
+        if(desc.frameBuffer) {
+            if(!BindTarget(*desc.frameBuffer))return;
+            width=desc.frameBuffer->resolution.x;height=desc.frameBuffer->resolution.y;
+        }else {glBindFramebuffer(GL_FRAMEBUFFER,0);emscripten_get_canvas_element_size("#canvas",&width,&height);}
         if (!_reported) emscripten_log(EM_LOG_CONSOLE,"Upload GL error: 0x%x",glGetError());
         glViewport(0,0,width,height);
+        glDepthMask(GL_TRUE);glDisable(GL_SCISSOR_TEST);
         glClearColor(0.45f,0.65f,0.85f,1.0f);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         if (!Locator::terrainSystem::has_value()) return;
         glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDisable(GL_CULL_FACE);
         glBindVertexArray(_vao);
         if(desc.drawSky && Locator::skySystem::has_value())DrawSky(*desc.camera);
+        if(desc.drawWater && Locator::oceanSystem::has_value())DrawWater(*desc.camera);
         glUseProgram(_program); glBindVertexArray(_vao);
+        glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY,static_cast<GLuint>(Locator::terrainSystem::value().GetAlbedoArray().handle.id));
         glUniform1i(glGetUniformLocation(_program,"materials"),0);
@@ -248,7 +297,7 @@ void main(){
             _modelsReported=true;
         }
     }
-	void Frame() noexcept final {if(Locator::debugGui::has_value())Locator::debugGui::value().Draw(nullptr,nullptr);}
+	void Frame() noexcept final {glBindFramebuffer(GL_FRAMEBUFFER,0);if(Locator::debugGui::has_value())Locator::debugGui::value().Draw(nullptr,nullptr);}
 	void RequestScreenshot(const std::filesystem::path&) noexcept final {}
 	[[nodiscard]] bool GetDebug() const noexcept final { return _debug; }
 	void SetDebug(bool value) noexcept final { _debug = value; }
@@ -308,6 +357,7 @@ void main(){
 	                                                 uint16_t layers, TextureFormat format, Wrapping wrapping, Filter filter) noexcept final
 	{
 		GLuint handle=0;
+        glPixelStorei(GL_UNPACK_ALIGNMENT,1);
         if (format == TextureFormat::BGR5A1 && layers > 1) {
             const size_t count=static_cast<size_t>(resolution.x)*resolution.y*layers;
             if (memory.size() < count*2) return nullptr;
@@ -340,6 +390,9 @@ void main(){
                     rgba[i*4]=((pixel>>8)&15)*17;rgba[i*4+1]=((pixel>>4)&15)*17;
                     rgba[i*4+2]=(pixel&15)*17;rgba[i*4+3]=(pixel>>12)*17;
                 }
+            } else if((format==TextureFormat::R8 || format==TextureFormat::A8) && memory.size()>=count) {
+                rgba.resize(count*4);
+                for(size_t i=0;i<count;++i){rgba[i*4]=rgba[i*4+1]=rgba[i*4+2]=memory[i];rgba[i*4+3]=255;}
             } else if((format==TextureFormat::RGBA8 || format==TextureFormat::BGRA8) && memory.size()>=count*4) {
                 rgba.assign(memory.begin(),memory.begin()+count*4);
                 if(format==TextureFormat::BGRA8)for(size_t i=0;i<count;++i)std::swap(rgba[i*4],rgba[i*4+2]);
@@ -361,11 +414,53 @@ void main(){
 	                                                             TextureFormat colorFormat,
 	                                                             std::optional<TextureFormat> depthStencilFormat) noexcept final
 	{
-		return std::make_unique<FrameBuffer>(std::move(name), resolution, colorFormat, depthStencilFormat, TextureHandle {},
-		                                     SamplerHandle {}, TextureHandle {}, [] {});
+        GLuint color=0,depth=0;
+        glGenTextures(1,&color);glBindTexture(GL_TEXTURE_2D,color);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,resolution.x,resolution.y,0,GL_RGBA,GL_UNSIGNED_BYTE,nullptr);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        if(depthStencilFormat) {
+            glGenTextures(1,&depth);glBindTexture(GL_TEXTURE_2D,depth);
+            glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH24_STENCIL8,resolution.x,resolution.y,0,GL_DEPTH_STENCIL,GL_UNSIGNED_INT_24_8,nullptr);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        }
+        auto result=std::make_unique<FrameBuffer>(std::move(name),resolution,colorFormat,depthStencilFormat,TextureHandle{color},SamplerHandle{},TextureHandle{depth},[color,depth]{glDeleteTextures(1,&color);if(depth)glDeleteTextures(1,&depth);});
+        BindTarget(*result);glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);glBindFramebuffer(GL_FRAMEBUFFER,0);
+        return result;
 	}
 
 private:
+    bool BindTarget(const FrameBuffer& target) const noexcept {
+        glBindFramebuffer(GL_FRAMEBUFFER,_framebuffer);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,target.colorAttachment.id,0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_TEXTURE_2D,target.depthStencilAttachment.id,0);
+        const auto status=glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if(status!=GL_FRAMEBUFFER_COMPLETE){emscripten_log(EM_LOG_ERROR,"Framebuffer %s incomplete: 0x%x",target.name.c_str(),status);return false;}
+        return true;
+    }
+    void DrawWater(const Camera& camera) const noexcept {
+        const auto& ocean=Locator::oceanSystem::value();
+        const auto& textures=Locator::resources::value().GetTextures();
+        if(!textures.Contains(ocean.GetDiffuseTexture())||!textures.Contains(ocean.GetAlphaTexture()))return;
+        const auto diffuse=textures.Handle(ocean.GetDiffuseTexture()),alpha=textures.Handle(ocean.GetAlphaTexture());
+        if(!diffuse->handle.id||!alpha->handle.id)return;
+        glUseProgram(_waterProgram);glDisable(GL_BLEND);glDepthMask(GL_TRUE);
+        const auto projection=camera.GetViewProjectionMatrix(Camera::Projection::Normal),view=camera.GetViewMatrix(Camera::Interpolation::Current);
+        glUniformMatrix4fv(glGetUniformLocation(_waterProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(_waterProgram,"view"),1,GL_FALSE,glm::value_ptr(view));
+        glUniform1f(glGetUniformLocation(_waterProgram,"skyType"),Locator::skySystem::value().GetCurrentSkyType());
+        const GLuint ids[]={GLuint(diffuse->handle.id),GLuint(alpha->handle.id),GLuint(ocean.GetReflectionFramebuffer().colorAttachment.id)};
+        const char* names[]={"diffuse","alphaMap","reflection"};
+        for(int i=0;i<3;++i){glActiveTexture(GL_TEXTURE0+i);glBindTexture(GL_TEXTURE_2D,ids[i]);glUniform1i(glGetUniformLocation(_waterProgram,names[i]),i);}
+        const auto& vertices=ocean.GetMesh().GetVertexBuffer();const auto& indices=ocean.GetMesh().GetIndexBuffer();
+        glBindBuffer(GL_ARRAY_BUFFER,vertices.handle.id);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indices.handle.id);
+        for(GLuint i=1;i<7;++i)glDisableVertexAttribArray(i);
+        glEnableVertexAttribArray(0);glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,vertices.strideBytes,nullptr);
+        glDrawElements(GL_TRIANGLES,indices.count,GL_UNSIGNED_SHORT,nullptr);
+        glActiveTexture(GL_TEXTURE2);glBindTexture(GL_TEXTURE_2D,0);glActiveTexture(GL_TEXTURE0);
+        if(!_waterReported){emscripten_log(EM_LOG_CONSOLE,"Original water and reflected scene: %u indices; GL error 0x%x",indices.count,glGetError());_waterReported=true;}
+    }
     void DrawSky(const Camera& camera) const noexcept {
         const auto& sky=Locator::skySystem::value();
         if(!sky.GetTexture().handle.id || sky.GetMesh().GetSubMeshes().empty())return;
@@ -460,9 +555,9 @@ private:
         }
     }
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE _context {};
-    GLuint _program {}, _objectProgram {}, _skyProgram {}, _vao {};
+    GLuint _program {}, _objectProgram {}, _skyProgram {}, _waterProgram {}, _vao {}, _framebuffer {};
 	bool _reported {}, _modelsReported {};
-    mutable bool _objectErrorReported {}, _animationReported {}, _skyReported {};
+    mutable bool _objectErrorReported {}, _animationReported {}, _skyReported {}, _waterReported {};
 	bool _debug {};
 	bool _profile {};
 };

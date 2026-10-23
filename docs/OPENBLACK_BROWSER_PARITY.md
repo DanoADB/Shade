@@ -9,9 +9,9 @@ Target: the implemented behavior of the native OpenBlack checkout in Shade, not 
 | Village, trees, original hand | Verified basic rendering | Native material/lighting match, terrain deformation and tree sway |
 | Packed villager animations | Implemented | Broader clip coverage and walking verification; native currently uses rest poses |
 | Sky | Original dome and nine-layer shader implemented; day/night verified | Broader alignment and scene comparisons |
-| Ocean | Missing | Original water texture, reflection framebuffer and reflected scene |
+| Ocean | Original water textures and reflected-scene pass implemented; Land2 coast verified | Native visual comparison across time/alignment and views |
 | Native debug UI | Native menus restored with Dear ImGui WebGL2 backend | Offscreen inspector rendering still needs render targets |
-| Offscreen render targets | Stub | Reflection, footprints, mesh viewer and texture viewer |
+| Offscreen render targets | RGBA8/depth-stencil targets implemented; reflection running | Footprint and inspector draw passes |
 | Lines and overlays | Missing | Bounding boxes, paths, streams and debug entities |
 | Sprites | Missing | Native sprite pass and blend behavior |
 | Audio | Compiles | Browser gesture unlock, real playback and spatial controls |
@@ -28,3 +28,7 @@ The earlier bring-your-own-assets deployment plan is superseded by the user's ho
 ## UI backend checkpoint
 
 Vendored the matching Dear ImGui 1.92.9b OpenGL backend from the installed dependency source, preserving its headers. Native SDL GPU builds keep their original backend. Browser tests opened the native World menu, changed to night, and loaded Land2 from Load Island. Original Land2 terrain, architecture and sky rendered without console errors. Deferred scene selection until native input capture settles. Loading another island disables the Land1 task and its camera shortcuts so saved task state cannot leak across maps. WASM/native builds and input/storage regression checks passed. Offscreen mesh/texture inspectors and capture are still incomplete.
+
+## Ocean checkpoint
+
+Replaced empty browser framebuffer handles with sampled RGBA8 targets and optional depth/stencil textures. The main scene now renders the engine reflected camera into the ocean target before drawing the original six-index sea plane. Water uses the same diffuse/alpha/horizon mixing as the native shader, with OpenGL texture Y conventions. R8 texture inputs now upload, and terrain retains its shoreline alpha over the water. Land1 startup and Land2 switching/coast rendering passed; framebuffer and water GL checks returned zero and no console errors appeared. Reflection visuals still need broader native comparison. Render targets increase graphics memory use; profiling remains an acceptance gap.
