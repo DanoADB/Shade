@@ -30,6 +30,7 @@
 #include "3D/L3DSubMesh.h"
 #include "ECS/Systems/RenderingSystemInterface.h"
 #include "Resources/ResourcesInterface.h"
+#include "Debug/DebugGuiInterface.h"
 
 #if !defined(LOCATOR_IMPLEMENTATIONS)
 #error "Locator interface implementations should only be included in Locator.cpp, use interface instead."
@@ -247,7 +248,7 @@ void main(){
             _modelsReported=true;
         }
     }
-	void Frame() noexcept final {}
+	void Frame() noexcept final {if(Locator::debugGui::has_value())Locator::debugGui::value().Draw(nullptr,nullptr);}
 	void RequestScreenshot(const std::filesystem::path&) noexcept final {}
 	[[nodiscard]] bool GetDebug() const noexcept final { return _debug; }
 	void SetDebug(bool value) noexcept final { _debug = value; }

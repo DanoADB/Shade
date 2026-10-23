@@ -88,7 +88,10 @@
     pointers.delete(event.pointerId);
     if (!start || gestureCancelled || performance.now() - start.time > 600) return;
     const rect = Module.canvas.getBoundingClientRect();
-    action(1, (event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height);
+    const x=(event.clientX-rect.left)/rect.width,y=(event.clientY-rect.top)/rect.height;
+    // SDL/ImGui consume queued pointer events during the engine frame. Let focus
+    // settle before asking the bridge to select an object behind a native menu.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>action(1,x,y)));
   });
   const cancel = () => { gestureCancelled = true; pointers.clear(); };
   Module.canvas.addEventListener('pointercancel', cancel);
@@ -96,8 +99,14 @@
   window.addEventListener('blur', cancel);
   document.addEventListener('visibilitychange', cancel);
   let started = false;
+  let islandChanged = false;
+  Module.shadeMapChanged = () => {
+    islandChanged = true;panel.hidden = true;marker.hidden = true;
+    for(const id of ['village','closeup','villager'])document.getElementById(id).disabled = true;
+    document.getElementById('status').textContent = 'Island loaded · use OpenBlack menus · reload to return to the Shade task';
+  };
   setInterval(() => {
-    if (document.getElementById('status').textContent !== 'Running...' || document.hidden) return;
+    if (islandChanged || document.getElementById('status').textContent !== 'Running...' || document.hidden) return;
     if (!started) {
       started = true;
       if (Module._shade_village_view) Module._shade_village_view(1);

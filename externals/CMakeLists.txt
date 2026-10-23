@@ -24,5 +24,9 @@ target_include_directories(
 )
 target_link_libraries(imgui_user PUBLIC imgui::imgui SDL3::SDL3)
 target_compile_definitions(imgui_user PUBLIC IMGUI_DEFINE_MATH_OPERATORS)
+if(EMSCRIPTEN)
+  target_sources(imgui_user PRIVATE imgui_user/imgui_impl_opengl3.cpp)
+  target_compile_definitions(imgui_user PRIVATE IMGUI_IMPL_OPENGL_ES3)
+endif()
 
 set_property(TARGET imgui_user PROPERTY FOLDER "externals")

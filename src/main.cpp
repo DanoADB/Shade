@@ -310,6 +310,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int shade_resize(int width, int height)
 #include "ECS/Components/Transform.h"
 #include <glm/geometric.hpp>
 #include "BrowserGameplay.h"
+#include "Debug/DebugGuiInterface.h"
 static openblack::browser::Gameplay& BrowserGameplay()
 {
     static openblack::browser::Gameplay gameplay;
@@ -317,6 +318,7 @@ static openblack::browser::Gameplay& BrowserGameplay()
 }
 extern "C" EMSCRIPTEN_KEEPALIVE void shade_gameplay(int action,float x,float y)
 {
+    if(action==1 && openblack::Locator::debugGui::has_value() && openblack::Locator::debugGui::value().StealsFocus())return;
     BrowserGameplay().Run(action,x,y);
 }
 extern "C" EMSCRIPTEN_KEEPALIVE int shade_gameplay_restore(int kind,uint32_t id,float x,float y,float z,uint32_t amount)

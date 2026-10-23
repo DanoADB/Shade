@@ -4,13 +4,13 @@ Target: the implemented behavior of the native OpenBlack checkout in Shade, not 
 
 | Area | Browser status | Remaining acceptance work |
 |---|---|---|
-| Original data and Land1 startup | Verified | Other supported levels and clean-profile startup |
+| Original data and Land1 startup | Land1 and native-menu switch to Land2 verified | Other supported levels and clean-profile startup |
 | Terrain materials | Partial | Bump maps, shore alpha, building footprints |
 | Village, trees, original hand | Verified basic rendering | Native material/lighting match, terrain deformation and tree sway |
 | Packed villager animations | Implemented | Broader clip coverage and walking verification; native currently uses rest poses |
-| Sky | Original dome and nine-layer shader implemented; day verified | Verify time/alignment controls and other scenes |
+| Sky | Original dome and nine-layer shader implemented; day/night verified | Broader alignment and scene comparisons |
 | Ocean | Missing | Original water texture, reflection framebuffer and reflected scene |
-| Native debug UI | Disabled | Browser renderer backend for existing menus and inspectors |
+| Native debug UI | Native menus restored with Dear ImGui WebGL2 backend | Offscreen inspector rendering still needs render targets |
 | Offscreen render targets | Stub | Reflection, footprints, mesh viewer and texture viewer |
 | Lines and overlays | Missing | Bounding boxes, paths, streams and debug entities |
 | Sprites | Missing | Native sprite pass and blend behavior |
@@ -24,3 +24,7 @@ Target: the implemented behavior of the native OpenBlack checkout in Shade, not 
 Existing native gaps include unimplemented script commands, incomplete creature/gameplay behavior and unverified original campaign progression. These must remain distinguished from browser-specific omissions. Shade wood/food tasks are additions and are not evidence of native parity.
 
 The earlier bring-your-own-assets deployment plan is superseded by the user's hosted automatic asset package. Experimental exporter edits remain outside the browser port changes.
+
+## UI backend checkpoint
+
+Vendored the matching Dear ImGui 1.92.9b OpenGL backend from the installed dependency source, preserving its headers. Native SDL GPU builds keep their original backend. Browser tests opened the native World menu, changed to night, and loaded Land2 from Load Island. Original Land2 terrain, architecture and sky rendered without console errors. Deferred scene selection until native input capture settles. Loading another island disables the Land1 task and its camera shortcuts so saved task state cannot leak across maps. WASM/native builds and input/storage regression checks passed. Offscreen mesh/texture inspectors and capture are still incomplete.

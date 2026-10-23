@@ -18,6 +18,10 @@
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlgpu3.h>
+#ifdef __EMSCRIPTEN__
+#include <imgui_impl_opengl3.h>
+#include <emscripten/emscripten.h>
+#endif
 #include <imgui_internal.h>
 #include <imgui_stdlib.h>
 #include <imgui_user.h>
@@ -53,17 +57,6 @@ using namespace openblack::debug::gui;
 
 std::unique_ptr<DebugGuiInterface> DebugGuiInterface::Create() noexcept
 {
-#ifdef __EMSCRIPTEN__
-    // The SDL GPU debug UI cannot use a WebGL device. Keep input available to the engine.
-    class BrowserGui final : public DebugGuiInterface {
-        bool StealsFocus() const noexcept override { return false; }
-        void SetScale(float) noexcept override {}
-        bool ProcessEvents(const SDL_Event&) noexcept override { return false; }
-        bool Loop() noexcept override { return false; }
-        void Draw(SDL_GPUCommandBuffer*, SDL_GPUTexture*) noexcept override {}
-    };
-    return std::make_unique<BrowserGui>();
-#endif
 	IMGUI_CHECKVERSION();
 	auto* imgui = ImGui::CreateContext();
 
@@ -91,6 +84,11 @@ std::unique_ptr<DebugGuiInterface> DebugGuiInterface::Create() noexcept
 		auto& windowingSystem = Locator::windowing::value();
 		auto& renderer = Locator::rendererInterface::value();
 		auto* window = reinterpret_cast<SDL_Window*>(windowingSystem.GetHandle());
+#ifdef __EMSCRIPTEN__
+        ImGui_ImplSDL3_InitForOpenGL(window,nullptr);
+        ImGui_ImplOpenGL3_Init("#version 300 es");
+        emscripten_log(EM_LOG_CONSOLE,"OpenBlack debug UI initialized with WebGL2 backend");
+#else
 		auto* device = reinterpret_cast<SDL_GPUDevice*>(renderer.GetDevice());
 
 		ImGui_ImplSDL3_InitForSDLGPU(window);
@@ -100,6 +98,7 @@ std::unique_ptr<DebugGuiInterface> DebugGuiInterface::Create() noexcept
 		    .MSAASamples = SDL_GPU_SAMPLECOUNT_1,
 		};
 		ImGui_ImplSDLGPU3_Init(&initInfo);
+#endif
 	}
 
 	return gui;
@@ -116,7 +115,11 @@ Gui::~Gui() noexcept
 {
 	if (!_headless)
 	{
-		ImGui_ImplSDLGPU3_Shutdown();
+#ifdef __EMSCRIPTEN__
+        ImGui_ImplOpenGL3_Shutdown();
+#else
+        ImGui_ImplSDLGPU3_Shutdown();
+#endif
 		ImGui_ImplSDL3_Shutdown();
 	}
 	ImGui::DestroyContext(_imgui);
@@ -195,7 +198,11 @@ bool Gui::ProcessEvents(const SDL_Event& event) noexcept
 void Gui::NewFrame() noexcept
 {
 	ImGui::SetCurrentContext(_imgui);
-	ImGui_ImplSDLGPU3_NewFrame();
+#ifdef __EMSCRIPTEN__
+    ImGui_ImplOpenGL3_NewFrame();
+#else
+    ImGui_ImplSDLGPU3_NewFrame();
+#endif
 	ImGui_ImplSDL3_NewFrame();
 	ImGuiIO& io = ImGui::GetIO();
 	io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
@@ -232,7 +239,9 @@ void Gui::Draw(SDL_GPUCommandBuffer* cmdBuf, SDL_GPUTexture* targetTexture) noex
 
 	ImDrawData* drawData = ImGui::GetDrawData();
 	const bool isMinimized = (drawData->DisplaySize.x <= 0.0f || drawData->DisplaySize.y <= 0.0f);
-
+#ifdef __EMSCRIPTEN__
+    if(!isMinimized)ImGui_ImplOpenGL3_RenderDrawData(drawData);
+#else
 	if (targetTexture != nullptr && !isMinimized)
 	{
 		// This is mandatory: call Imgui_ImplSDLGPU3_PrepareDrawData() to upload the vertex/index buffer!
@@ -256,6 +265,7 @@ void Gui::Draw(SDL_GPUCommandBuffer* cmdBuf, SDL_GPUTexture* targetTexture) noex
 
 		SDL_EndGPURenderPass(renderPass);
 	}
+#endif
 }
 
 bool Gui::ShowMenu() noexcept
@@ -290,6 +300,9 @@ bool Gui::ShowMenu() noexcept
 				if (ImGui::MenuItem(label.data(), nullptr, false, validLevel))
 				{
 					game.LoadMap(path);
+#ifdef __EMSCRIPTEN__
+                    EM_ASM({if(Module.shadeMapChanged)Module.shadeMapChanged();});
+#endif
 				}
 				if (!description.empty() && ImGui::IsItemHovered())
 				{

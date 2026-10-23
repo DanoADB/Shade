@@ -15,14 +15,17 @@ const document={hidden:false,getElementById:get,addEventListener(){},createEleme
 }};
 const canvas=element(),calls=[];let now=0,tick;
 const restored=[],stored=new Map();
+const frames=[];
 const Module={canvas,_shade_gameplay:(...args)=>calls.push(args),_shade_gameplay_restore:(...args)=>{restored.push(args);return 1;}};
 vm.runInNewContext(fs.readFileSync(require.resolve('../gameplay.js'),'utf8'),{
   document,Module,localStorage:{getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)},
-  window:{addEventListener(){}},performance:{now:()=>now},setInterval(fn){tick=fn;},Map,Math,Number
+  window:{addEventListener(){}},requestAnimationFrame:fn=>frames.push(fn),performance:{now:()=>now},setInterval(fn){tick=fn;},Map,Math,Number
 });
 const event=(pointerId,x=220,y=140)=>({pointerId,clientX:x,clientY:y,button:0});
 const send=(name,event)=>canvas.listeners[name](event);
 send('pointerdown',event(1));send('pointerup',event(1));
+assert.equal(calls.length,0,'Wait for native menu input capture before selection');
+while(frames.length)frames.shift()();
 assert.deepEqual(calls.pop(),[1,.5,.5],'Selection uses canvas-relative coordinates');
 send('pointerdown',event(1));send('pointermove',event(1,250));send('pointerup',event(1,220));
 assert.equal(calls.length,0,'A drag returning to its start must not select');
@@ -55,4 +58,6 @@ get('status').textContent='Running...';tick();assert.deepEqual(calls.pop(),[0,0,
 assert.deepEqual(restored,[[0,0,0,0,0,0],[1,42,10,20,30,0],[2,7,11,22,33,110],[4,8,12,22,33,0],[5,7,11,22,33,10],[6,9,12,21,32,90],[3,0,0,0,0,0]],'Wood, fields, food stocks and hunger restore in one staged transaction');
 tick();calls.pop();assert.equal(restored.length,7,'Restore only runs once');
 document.hidden=true;tick();assert.equal(calls.length,0,'Do not poll a hidden page');
+document.hidden=false;Module.shadeMapChanged();tick();assert.equal(calls.length,0,'Do not apply Land1 task state after native island switching');
+assert.equal(created[0].hidden,true);assert.equal(get('village').disabled,true);
 console.log('Gameplay tap, drag, pinch, cancellation, startup, save/resume and action availability passed.');
