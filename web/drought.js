@@ -5,7 +5,7 @@
   .drought-place{position:absolute;transform:translate(-50%,-100%);z-index:2;min-height:30px!important;padding:5px 9px!important;font:11px system-ui!important;white-space:nowrap;background:#183a32dd!important;border:1px solid #c1b37e99!important;border-radius:20px!important;color:#eee1b9!important;box-shadow:0 2px 10px #0005}.drought-place[hidden]{display:none}#drought{position:absolute;right:18px;top:18px;width:320px;max-height:calc(100% - 36px);overflow:auto;padding:20px;background:linear-gradient(145deg,#122b26f5,#12201df5);border:1px solid #a8976255;border-radius:16px;box-shadow:0 12px 50px #0006;z-index:3}#drought h1{font:30px Georgia,serif;margin:4px 0 8px;color:#f4dfad}#drought .eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#c0b37d}#drought p{font-size:12px;line-height:1.5;color:#c9d3c4;margin:8px 0}#drought button{font-size:12px;padding:7px 9px;min-height:40px}#drought .actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:12px 0}#drought .metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}#drought label{font-size:10px;color:#c7cfbb}#drought meter{display:block;width:100%;height:9px;accent-color:#9cbc73}#drought output{display:block;color:#f0d9a1;font-size:17px;margin:3px 0}#drought .line{border-top:1px solid #b8a16a33;padding-top:10px}#drought .story{padding-left:15px;font:12px/1.5 Georgia,serif;color:#d5d9c7}#drought .story li{margin:7px 0}#drought-state{font:18px Georgia,serif;color:#eedbaa}#drought select{width:100%;min-height:40px;background:#263e32;color:#f0dfb4;border:1px solid #9bab87;border-radius:8px;padding:7px}#drought button:disabled{opacity:.38}#drought-weather{position:absolute;inset:0;pointer-events:none;z-index:1;opacity:0;background:repeating-linear-gradient(108deg,transparent 0,transparent 45px,#a8d5e533 46px,transparent 47px);background-size:150px 180px}#drought-weather.raining{opacity:.65;animation:drought-rain .6s linear infinite}@keyframes drought-rain{to{background-position:-55px 180px}}#drought-hint{position:absolute;left:20px;bottom:24px;max-width:420px;background:#10221dd9;padding:12px 16px;border-left:2px solid #c2b178;border-radius:0 8px 8px 0;color:#e4debf;font:13px/1.5 Georgia,serif;pointer-events:none;z-index:2}
   @media(max-width:700px){#drought{right:8px;top:8px;width:270px;padding:12px;max-height:60%}#drought h1{font-size:24px}#drought-hint{left:10px;bottom:130px;max-width:210px;font-size:11px}#drought .story{display:none}#drought.collapsed .body{display:none}#drought.collapsed>p,#drought.collapsed>.eyebrow{display:none}#drought.collapsed h1{font-size:20px;margin:0 0 8px}}@media(prefers-reduced-motion:reduce){#drought-weather.raining{animation:none}}
   `;document.head.append(style);
-  const panel=document.createElement('section');panel.id='drought';panel.setAttribute('aria-label','The long dry season');panel.innerHTML=`<span class="eyebrow">Shade · first playable chapter</span><h1>The Long Dry</h1><p>You are unseen. The creature is their god. Influence its instincts; earn a future for this village.</p><button id="drought-collapse" aria-expanded="true">Hide details</button><div class="body"><label for="drought-god">Their god</label><select id="drought-god"><option value="0">Cow</option><option value="1">Rhino</option><option value="2">Sheep</option></select><p id="drought-god-status" aria-live="polite">Cow · your lessons stay with the creature when you swap.</p><div class="metrics" id="drought-metrics"></div><div id="drought-state" aria-live="polite">Waiting for the island…</div><p id="drought-intent"></p><div class="actions"><button data-nudge="care">Stir compassion</button><button data-nudge="explore">Kindle curiosity</button><button data-nudge="rest">Offer calm</button><button data-nudge="rain">Dream of rain</button><button data-nudge="praise">Share warmth</button><button data-nudge="discourage">Show unease</button></div><p id="drought-learning"></p><p id="drought-navigation" role="status"></p><p id="drought-workers" class="line"></p><ul class="story" id="drought-story" aria-live="polite"></ul><div class="actions"><button id="drought-focus">Follow creature</button><button id="drought-pause">Pause</button><button id="drought-save">Save game</button><button id="drought-restart">Begin again</button></div><p id="drought-save-status" role="status">Progress saves on this browser.</p><p id="drought-result"></p></div>`;
+  const panel=document.createElement('section');panel.id='drought';panel.setAttribute('aria-label','The long dry season');panel.innerHTML=`<span class="eyebrow">Shade · first playable chapter</span><h1>The Long Dry</h1><p>You are unseen. The creature is their god. Influence its instincts; earn a future for this village.</p><button id="drought-collapse" aria-expanded="true">Hide details</button><div class="body"><label for="drought-god">Their god</label><select id="drought-god"><option value="0">Cow</option><option value="1">Rhino</option><option value="2">Sheep</option></select><p id="drought-god-status" aria-live="polite">Cow · your lessons stay with the creature when you swap.</p><details id="drought-hand"><summary>Hand tools · pick up wood and food</summary><p>Tap an object or use Find. Pick up a resource, then deliver it or return it. Held resources return to their source on reload.</p><div class="actions"><button id="hand-tree">Find tree</button><button id="hand-field">Find food</button><button id="hand-building">Find building</button><button id="hand-villager">Find villager</button><button id="hand-pick">Pick up resource</button><button id="hand-deliver">Deliver resource</button><button id="hand-return">Return resource</button></div><p id="hand-status" role="status">Choose a tree or field to pick up wood or food.</p></details><div class="metrics" id="drought-metrics"></div><div id="drought-state" aria-live="polite">Waiting for the island…</div><p id="drought-intent"></p><div class="actions"><button data-nudge="care">Stir compassion</button><button data-nudge="explore">Kindle curiosity</button><button data-nudge="rest">Offer calm</button><button data-nudge="rain">Dream of rain</button><button data-nudge="praise">Share warmth</button><button data-nudge="discourage">Show unease</button></div><p id="drought-learning"></p><p id="drought-navigation" role="status"></p><p id="drought-workers" class="line"></p><ul class="story" id="drought-story" aria-live="polite"></ul><div class="actions"><button id="drought-focus">Follow creature</button><button id="drought-pause">Pause</button><button id="drought-save">Save game</button><button id="drought-restart">Begin again</button></div><p id="drought-save-status" role="status">Progress saves on this browser.</p><p id="drought-result"></p></div>`;
   document.getElementById('stage').append(panel);
   const weather=document.createElement('div');weather.id='drought-weather';document.getElementById('stage').append(weather);
   const hint=document.createElement('div');hint.id='drought-hint';hint.textContent='A village beneath a silent sky. Watch what the creature chooses, then respond to the lesson it learns.';document.getElementById('stage').append(hint);
@@ -36,6 +36,25 @@
   }
   const escapeText=text=>text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const codes={idle:0,care:1,explore:2,rest:3,channel:4,rain:5};
+  function handAction(code,x=0,y=0){
+    if(!started||stopped||temple||!Module._shade_gameplay)return;
+    closeup=false;focus=0;$('drought-focus').textContent='Follow creature';
+    Module._shade_gameplay(code,x,y);saveGame();draw();
+  }
+  for(const [id,code] of Object.entries({'hand-tree':4,'hand-field':9,'hand-building':5,'hand-villager':6,'hand-pick':2,'hand-deliver':3,'hand-return':7}))$(id).onclick=()=>handAction(code);
+  let handState=null;
+  Module.shadeGameplayUpdate=state=>{handState=state;
+    let message=state.message.startsWith('Supply 30 wood')?'Choose a tree or field to pick up wood or food.':state.message;
+    if(state.carrying&&!message.startsWith('Carrying'))message='Holding '+(state.foodHeld?'food':'wood')+'. '+message;
+    $('hand-status').textContent=message;
+  };
+  const pointers=new Map();let cancelled=false;
+  Module.canvas.addEventListener('pointerdown',e=>{if(!pointers.size)cancelled=false;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,time:performance.now()});if(pointers.size>1||e.button!==0)cancelled=true;});
+  Module.canvas.addEventListener('pointermove',e=>{const p=pointers.get(e.pointerId);if(p&&Math.hypot(e.clientX-p.x,e.clientY-p.y)>10)cancelled=true;});
+  Module.canvas.addEventListener('pointerup',e=>{const p=pointers.get(e.pointerId);pointers.delete(e.pointerId);if(!p||cancelled||performance.now()-p.time>600)return;const rect=Module.canvas.getBoundingClientRect();handAction(1,(e.clientX-rect.left)/rect.width,(e.clientY-rect.top)/rect.height);});
+  const cancelHand=()=>{pointers.clear();cancelled=true;};
+  for(const event of ['pointercancel','pointerleave'])Module.canvas.addEventListener(event,cancelHand);
+  window.addEventListener('blur',cancelHand);
   function routes(){
     if(!Module._shade_drought_routes)return {};
     const mask=Module._shade_drought_routes(),jobs=['hauling water','tending crops','protecting trees'];
@@ -53,6 +72,12 @@
     $('drought-navigation').textContent=blocked.join(' ');
     $('drought-workers').textContent=model.workers?model.workers.map(w=>`${w.name}: ${w.job}`).join(' · '):'Villagers are organizing their response.';
     $('drought-story').innerHTML=model.events.map(e=>`<li>${escapeText(e.text)}</li>`).join('');
+    const handReady=started&&!stopped&&!temple;
+    for(const id of ['hand-tree','hand-field','hand-building','hand-villager'])$(id).disabled=!handReady;
+    $('hand-pick').disabled=!handReady||!handState||![1,4].includes(handState.kind)||handState.gathered||handState.carrying;
+    $('hand-deliver').disabled=!handReady||!handState||!handState.carrying||!([2,4].includes(handState.kind)||(handState.foodHeld&&handState.kind===3&&handState.hunger>0));
+    $('hand-return').disabled=!handReady||!handState||!handState.carrying;
+    $('hand-pick').textContent=handState&&handState.carrying?(handState.foodHeld?'Holding food':'Holding wood'):handState&&handState.kind===4?'Pick up food':'Pick up wood';
     $('drought-save-status').textContent=saveMessage;
     $('drought-save').disabled=!started||stopped||temple;
     $('drought-god').disabled=!started||stopped||temple;
@@ -78,11 +103,11 @@
   $('drought-pause').onclick=()=>{paused=!paused;restored=false;last=performance.now();$('drought-pause').textContent=paused?'Resume':'Pause';saveGame();draw();};
   $('drought-restart').onclick=()=>{if(stopped){location.reload();return;}model=new ShadeDrought.Drought();closeup=false;focus=0;$('drought-focus').textContent='Follow creature';Module._shade_drought(0,0,0,1,1);paused=false;restored=false;saveBlocked=false;last=performance.now();$('drought-pause').textContent='Pause';saveGame(true);draw();};
   $('drought-collapse').onclick=()=>{panel.classList.toggle('collapsed');const collapsed=panel.classList.contains('collapsed');panel.querySelector('.body').hidden=collapsed;$('drought-collapse').textContent=collapsed?'Show details':'Hide details';$('drought-collapse').setAttribute('aria-expanded',String(!collapsed));};
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)saveGame();last=performance.now();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){saveGame();cancelHand();}last=performance.now();});
   window.addEventListener('pagehide',()=>saveGame());
   document.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='p'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA'&&e.target.tagName!=='SELECT'){e.preventDefault();e.stopImmediatePropagation();if(started&&!stopped)$('drought-pause').onclick();}},true);
-  Module.shadeTempleChanged=active=>{if(active)saveGame();temple=active;if(active)places.forEach(b=>b.hidden=true);last=performance.now();panel.hidden=active;hint.hidden=active;weather.hidden=active;};
-  Module.shadeStop=reason=>{saveGame();stopped=true;places.forEach(b=>b.hidden=true);if(Module.mobileControls)Module.mobileControls.stop();$('touch-toggle').disabled=true;document.querySelectorAll('[data-control]').forEach(button=>button.disabled=true);$('status').textContent=reason;$('restart').hidden=false;$('restart').onclick=()=>location.reload();draw();};
+  Module.shadeTempleChanged=active=>{if(active){saveGame();cancelHand();}temple=active;if(active)places.forEach(b=>b.hidden=true);last=performance.now();panel.hidden=active;hint.hidden=active;weather.hidden=active;};
+  Module.shadeStop=reason=>{saveGame();cancelHand();stopped=true;places.forEach(b=>b.hidden=true);if(Module.mobileControls)Module.mobileControls.stop();$('touch-toggle').disabled=true;document.querySelectorAll('[data-control]').forEach(button=>button.disabled=true);$('status').textContent=reason;$('restart').hidden=false;$('restart').onclick=()=>location.reload();draw();};
   Module.shadeMapChanged=()=>Module.shadeStop('Drought paused: island changed. Reload to return to the scenario.');
   Module.canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();Module.shadeStop('Graphics interrupted. Reload to return to the scenario.');if(Module._shade_pause_loop)Module._shade_pause_loop();});
   Module.canvas.addEventListener('webglcontextrestored',()=>Module.shadeStop('Graphics restored. Reload to rebuild the island.'));
@@ -97,6 +122,7 @@
     if(Module._shade_drought_weather)Module._shade_drought_weather(1-model.water/100,model.rain>0?1:0);
     if(Module._shade_drought_worker)model.workers.forEach((w,i)=>Module._shade_drought_worker(i,{'hauling water':0,'tending crops':1,'protecting trees':2}[w.job],w.progress));
     if(result!==1){Module.shadeStop('Scenario scene changed. Reload to begin again.');return;}
+    if(Module._shade_gameplay)Module._shade_gameplay(0,0,0);
     if(!restored&&now-lastSaved>=2000)saveGame();draw();
   },100);
   draw();

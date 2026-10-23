@@ -375,7 +375,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         if(desc.drawSky && Locator::skySystem::has_value())DrawSky(*desc.camera);
         if(desc.drawWater && Locator::oceanSystem::has_value())DrawWater(*desc.camera);
         glUseProgram(_program); glBindVertexArray(_vao);
-        glUniform1f(glGetUniformLocation(_program,"shadeLook"),Locator::config::value().hidePlayerHand?1.f:0.f);
+        glUniform1f(glGetUniformLocation(_program,"shadeLook"),Locator::config::value().shadeDroughtScene?1.f:0.f);
         glUniform1f(glGetUniformLocation(_program,"shadeRain"),browser::droughtRain);glUniform1f(glGetUniformLocation(_program,"shadeDryness"),browser::droughtDryness);
         glEnable(GL_BLEND);glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
         glActiveTexture(GL_TEXTURE0);
@@ -427,7 +427,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         glActiveTexture(GL_TEXTURE4);glBindTexture(GL_TEXTURE_2D,island.GetHeightMap().handle.id);
         glUniform1i(glGetUniformLocation(_objectProgram,"heightMap"),4);glActiveTexture(GL_TEXTURE0);
         glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
-        glUniform1f(glGetUniformLocation(_objectProgram,"shadeLook"),Locator::config::value().hidePlayerHand?1.f:0.f);
+        glUniform1f(glGetUniformLocation(_objectProgram,"shadeLook"),Locator::config::value().shadeDroughtScene?1.f:0.f);
         glUniform1f(glGetUniformLocation(_objectProgram,"shadeRain"),browser::droughtRain);glUniform1f(glGetUniformLocation(_objectProgram,"shadeDryness"),browser::droughtDryness);
         const auto cameraOrigin=desc.camera->GetOrigin();glUniform3fv(glGetUniformLocation(_objectProgram,"cameraOrigin"),1,glm::value_ptr(cameraOrigin));
         const auto& context=Locator::rendereringSystem::value().GetContext();
@@ -442,7 +442,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
                 const auto& animation=index<context.instanceAnimations.size()?context.instanceAnimations[index]:restPose;
                 const auto time=animation.started<0 ? desc.time+animation.phase : uint32_t(std::max<int64_t>(0,
                     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()-animation.started));
-                if(Locator::config::value().hidePlayerHand&&key.meshId==browser::droughtCreatureMesh){
+                if(Locator::config::value().shadeDroughtScene&&key.meshId==browser::droughtCreatureMesh){
                     const auto& pose=browser::SampleDroughtCreature();DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),AnimId::Invalid,time,false,nullptr,255,false,pose.data(),pose.size());
                 }else DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),animation.clip,time,instances.morphWithTerrain);
             }
@@ -462,7 +462,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
             if(desc.drawFootpaths)DrawLines(context.footpaths.get(),matrix,glm::mat4(1));
             if(desc.drawStreams)DrawLines(context.streams.get(),matrix,glm::mat4(1));
         }
-        if(Locator::config::value().hidePlayerHand)DrawWaterworks(matrix);
+        if(Locator::config::value().shadeDroughtScene)DrawWaterworks(matrix);
         if(desc.drawSprites)DrawSprites(desc);
         glDepthMask(GL_TRUE);glDisable(GL_BLEND);
         glBindVertexArray(0);
@@ -509,7 +509,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         glBindVertexArray(_vao);glUseProgram(_objectProgram);
         const auto matrix=desc.camera->GetViewProjectionMatrix(Camera::Projection::Normal);
         glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
-        glUniform1f(glGetUniformLocation(_objectProgram,"shadeLook"),Locator::config::value().hidePlayerHand?1.f:0.f);
+        glUniform1f(glGetUniformLocation(_objectProgram,"shadeLook"),Locator::config::value().shadeDroughtScene?1.f:0.f);
         glUniform1f(glGetUniformLocation(_objectProgram,"shadeRain"),browser::droughtRain);glUniform1f(glGetUniformLocation(_objectProgram,"shadeDryness"),browser::droughtDryness);
         const auto cameraOrigin=desc.camera->GetOrigin();glUniform3fv(glGetUniformLocation(_objectProgram,"cameraOrigin"),1,glm::value_ptr(cameraOrigin));
         glUniform1f(glGetUniformLocation(_objectProgram,"skyType"),Locator::skySystem::value().GetCurrentSkyType());

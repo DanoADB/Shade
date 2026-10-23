@@ -44,6 +44,7 @@ struct EngineConfig
 	bool drawIsland {true};
 	bool drawEntities {true};
 	bool hidePlayerHand {false};
+	bool shadeDroughtScene {false};
 	bool drawVegetation {true};
 	bool drawSprites {true};
 	bool drawBoundingBoxes {false};

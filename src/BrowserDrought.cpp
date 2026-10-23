@@ -235,7 +235,7 @@ public:
             for(size_t i=0;i<std::min(size_t(3),candidates.size());++i){workers.push_back(candidates[i].second);workerHomes.push_back(registry.Get<Transform>(workers.back()).position);workerProps.push_back(Prop(MeshId::U_Bucket,workerHomes.back(),.8f));}
             if(!BuildRoutes()){emscripten_log(EM_LOG_ERROR,"No safe creature clearing found");return -4;}
             emscripten_log(EM_LOG_CONSOLE,"Drought workers: %zu original villagers with autonomous jobs",workers.size());
-            Locator::config::value().hidePlayerHand=true;focus=1;
+            Locator::config::value().shadeDroughtScene=true;Locator::config::value().hidePlayerHand=false;focus=1;
             emscripten_log(EM_LOG_CONSOLE,"Drought creature: original model %s, %zu bones, scale %.3f",mesh->GetDebugName().c_str(),mesh->GetBoneMatrices().size(),scale);
         }
         if(!registry.Valid(creature))return -2;

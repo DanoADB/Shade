@@ -20,6 +20,8 @@
 #include "ECS/Systems/HandSystemInterface.h"
 #include "Resources/ResourceManager.h"
 #include "3D/AllMeshes.h"
+#include "3D/LandIslandInterface.h"
+#include "EngineConfig.h"
 #include "Locator.h"
 
 namespace openblack::browser
@@ -98,7 +100,9 @@ class Gameplay
         selected=candidate;
         if(!Kind(selected)){message="No matching object nearby.";return;}
         const auto anchor=Anchor(selected);
-        Locator::camera::value().SetFocus(anchor).SetOrigin(anchor+glm::vec3(20,22,-30));
+        auto eye=anchor+glm::vec3(20,22,-30);
+        if(Locator::config::value().shadeDroughtScene&&Locator::terrainSystem::has_value())for(int i=0;i<16;++i){float t=i/16.f;auto p=glm::mix(eye,anchor,t);float floor=Locator::terrainSystem::value().GetHeightAt({p.x,p.z});eye.y=std::max(eye.y,(floor+3-t*anchor.y)/(1-t));}
+        Locator::camera::value().SetFocus(anchor).SetOrigin(eye);
         message="Object selected. Choose an action below.";
     }
     void Select(float x,float y)

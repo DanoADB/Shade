@@ -1,5 +1,5 @@
 {
-  "source_revision": "a623815e32e731fc39d70c357a9b05158dc03e8a",
+  "source_revision": "9f3dba086d2d3c223193444ddfee90726a689ec5",
   "engine": "openblack-webgl2",
   "original_assets_bundled": true,
   "files": {
@@ -12,8 +12,8 @@
       "sha256": "509d1dd7346d9f08a4bf857ca6bd5974c3445d8cf5272d029bd597d940300eb9"
     },
     "openblack.wasm": {
-      "bytes": 3952169,
-      "sha256": "708cd217842755a5c8ffacb8f489fbc6c6daa73d086ce94567507e4b8cd6b2e6"
+      "bytes": 3952376,
+      "sha256": "d1664c87336c97672ef79c9385c3aa162b8c44416d66c7aad3a77bf69fb44fdc"
     },
     "mobile-controls.js": {
       "bytes": 4295,
@@ -28,8 +28,8 @@
       "sha256": "e624b12772a2f6cf1d89b6fe72911845db96899af15fbb3687964412cc0b3a28"
     },
     "drought.js": {
-      "bytes": 16431,
-      "sha256": "5dcefa580c0fd9897d246a61d3b49e7186c6ee7e1db23b74025f5dd443bb3419"
+      "bytes": 19642,
+      "sha256": "18227c184f0fc0d5e7364b4a8d338c9dc5530f774a3a380a5dc7fe47e03ab2b7"
     }
   }
 }
