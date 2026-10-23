@@ -23,7 +23,7 @@ var Module = {
  arguments: ['-g','/game','--start-level',launchOptions.level,'-l','stdout'],
  print: line => { const log=document.getElementById('output'); log.value+=line+'\n';log.scrollTop=log.scrollHeight; },
  printErr: line => Module.print(line),
- setStatus: text => { if(text) document.getElementById('status').textContent=text; if(text==='Running...'){for(const id of ['village','closeup','villager'])document.getElementById(id).disabled=Module.shadeNative || Module.shadeDrought;if(Module.mobileControls)Module.mobileControls.ready();} },
+ setStatus: text => { if(Module.shadeGraphicsFailed)return; if(text) document.getElementById('status').textContent=text; if(text==='Running...'){for(const id of ['village','closeup','villager'])document.getElementById(id).disabled=Module.shadeNative || Module.shadeDrought;if(Module.mobileControls)Module.mobileControls.ready();} },
  onAbort: reason => Module.shadeStop ? Module.shadeStop('Engine stopped: '+reason) : Module.setStatus('Engine stopped: '+reason),
  onExit: code => Module.setStatus('Engine exited ('+code+'). See log below.'),
  preRun: [function() {
@@ -83,6 +83,15 @@ var Module = {
    }).catch(error=>{Module.setStatus('Game files could not load: '+error.message);button.hidden=false;});
   }
  }]
+};
+// Keep renderer failure distinct from missing creature assets and loader status.
+Module.canvas.addEventListener('webglcontextcreationerror',event=>{Module.shadeGraphicsReason=event.statusMessage||'The browser refused a WebGL2 context.';});
+Module.shadeGraphicsFailure=reason=>{
+ Module.shadeGraphicsFailed=true;
+ const message='Graphics could not start. Close other game tabs and reopen this page in a fresh tab. If it still fails, restart the browser with graphics acceleration enabled.';
+ Module.print(reason+(Module.shadeGraphicsReason?': '+Module.shadeGraphicsReason:''));
+ if(Module.shadeStop)Module.shadeStop(message);else document.getElementById('status').textContent=message;
+ const button=document.getElementById('restart');button.hidden=false;button.textContent='Retry graphics';button.onclick=()=>location.reload();
 };
 window.addEventListener('error', event=>Module.setStatus('Engine error: '+event.message));
 window.addEventListener('unhandledrejection', event=>Module.setStatus('Engine error: '+String(event.reason)));

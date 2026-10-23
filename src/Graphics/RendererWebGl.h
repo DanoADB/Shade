@@ -56,8 +56,23 @@ public:
         attributes.majorVersion = 2;
         attributes.alpha = false;
         auto context = emscripten_webgl_create_context("#canvas", &attributes);
-        if (context <= 0 || emscripten_webgl_make_context_current(context) != EMSCRIPTEN_RESULT_SUCCESS)
+        if(context<=0){
+            emscripten_log(EM_LOG_WARN,"WebGL2 context creation failed (%d); retrying without multisampling",context);
+            attributes.antialias=false;attributes.powerPreference=EM_WEBGL_POWER_PREFERENCE_LOW_POWER;
+            context=emscripten_webgl_create_context("#canvas",&attributes);
+        }
+        if(context<=0){
+            emscripten_log(EM_LOG_ERROR,"WebGL2 context unavailable after compatibility retry (code %d)",context);
+            EM_ASM({if(Module.shadeGraphicsFailure)Module.shadeGraphicsFailure('WebGL2 context creation failed');});
             return nullptr;
+        }
+        const auto current=emscripten_webgl_make_context_current(context);
+        if(current!=EMSCRIPTEN_RESULT_SUCCESS){
+            emscripten_log(EM_LOG_ERROR,"WebGL2 make-current failed: %d",current);
+            emscripten_webgl_destroy_context(context);
+            EM_ASM({if(Module.shadeGraphicsFailure)Module.shadeGraphicsFailure('WebGL2 context activation failed');});
+            return nullptr;
+        }
         auto renderer = std::make_unique<RendererWebGl>();
         renderer->_context = context;
         renderer->_compressedTextures = !EM_ASM_INT({return !!Module.shadeDecodeTextures;}) &&
@@ -318,7 +333,10 @@ out vec4 outputColor;
 void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
 )";
         renderer->_spriteProgram=CompileProgram(spriteVertex,spriteFragment);
-        if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram || !renderer->_waterProgram || !renderer->_footprintProgram || !renderer->_lineProgram || !renderer->_spriteProgram) return nullptr;
+        if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram || !renderer->_waterProgram || !renderer->_footprintProgram || !renderer->_lineProgram || !renderer->_spriteProgram){
+            EM_ASM({if(Module.shadeGraphicsFailure)Module.shadeGraphicsFailure('WebGL2 shader setup failed; see Details');});
+            return nullptr;
+        }
         glGenVertexArrays(1,&renderer->_vao);
         glGenBuffers(1,&renderer->_surfaceBuffer);
         glGenFramebuffers(1,&renderer->_framebuffer);

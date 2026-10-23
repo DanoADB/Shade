@@ -84,3 +84,7 @@ The P key started simulation with advancing turns; arrow-right moved the camera,
 ## Shade functionality audit and creature motion
 
 The [2026-10-23 functionality audit](FUNCTIONALITY_AUDIT.md) distinguishes shared native stubs, browser parity work and intentional Shade gameplay differences. Cow, Rhino and Sheep now use separate original CBN animation banks with live selection in the drought slice. This custom controller is not native creature AI parity. Highest next priorities are drought save/resume, obstacle-aware movement, physical interaction polish and richer village needs.
+
+## Renderer startup recovery
+
+WebGL2 creation now retries without multisampling using a low-power preference. Failures identify context creation, activation or shader setup; the browser's context-creation reason is retained in Details. A graphics-startup failure cannot be overwritten by the loader's Running status or mistaken for missing creature assets. Retry graphics reloads without clearing the drought save. A fresh local tab recovered the reported class of failure after obsolete engine tabs were closed; this does not establish the cause on another browser or production deployment. The graphics-startup fixture verifies sticky errors, diagnostic text and retry behavior.

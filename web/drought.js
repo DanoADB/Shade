@@ -113,7 +113,7 @@
   Module.canvas.addEventListener('webglcontextrestored',()=>Module.shadeStop('Graphics restored. Reload to rebuild the island.'));
   setInterval(()=>{
     const now=performance.now(),dt=(now-last)/1000;last=now;
-    if(stopped||temple||document.hidden||$('status').textContent!=='Running...')return;
+    if(stopped||Module.shadeGraphicsFailed||temple||document.hidden||$('status').textContent!=='Running...')return;
     if(!started){const ok=Module._shade_drought&&Module._shade_drought(0,0,0,1,0);if(ok!==1){Module.shadeStop('The original cow creature could not load. See Details.');return;}if(selectedGod!=='0'&&(!Module._shade_drought_god||Module._shade_drought_god(Number(selectedGod))!==1)){Module.shadeStop('Saved god could not load. Reload to try again.');return;}if(restored&&Module._shade_drought_restore)Module._shade_drought_restore(model.deliveries);started=true;}
     else if(!paused)model.step(Math.min(dt,1),routes());
     const result=Module._shade_drought(codes[model.phase],model.elapsed/model.duration,model.deliveries,closeup?2:focus,0);focus=0;
