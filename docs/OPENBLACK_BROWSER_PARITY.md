@@ -4,16 +4,16 @@ Target: the implemented behavior of the native OpenBlack checkout in Shade, not 
 
 | Area | Browser status | Remaining acceptance work |
 |---|---|---|
-| Original data and Land1 startup | Land1 and native-menu switch to Land2 verified | Other supported levels and clean-profile startup |
+| Original data and story islands | Land1–Land5 and LandT loaded in browser; isolated native startup available | Demo2, clean-profile startup and broader scene comparisons |
 | Terrain materials | Native bump/detail, shore alpha and footprint passes implemented | Broader native pixel/scene comparison |
 | Village, trees, original hand | Original models, native lighting, terrain deformation and sway implemented | Wider model/material coverage and native visual comparison |
 | Packed villager animations | Implemented | Broader clip coverage and walking verification; native currently uses rest poses |
 | Sky | Original dome and nine-layer shader implemented; day/night verified | Broader alignment and scene comparisons |
 | Ocean | Original water textures and reflected-scene pass implemented; Land2 coast verified | Native visual comparison across time/alignment and views |
-| Native debug UI | Native menus, mesh preview and image tools restored | Wider inspector and keyboard coverage |
+| Native debug UI and Citadel | Native menus, mesh preview, image tools and Citadel enter/exit verified | Wider inspector, room navigation and keyboard coverage |
 | Offscreen render targets | Reflection, footprints and mesh preview implemented | More scene/format and resize coverage |
 | Lines and overlays | Scene/mesh bounding boxes, paths and streams verified | Compare remaining overlays against native |
-| Sprites | Native billboard/additive shader and entity pass implemented | Visual verification of glow/bookmark cases |
+| Sprites | Native billboard/additive pass; Citadel lamp glow disappears/reappears with native Sprites toggle | Bookmark cases and native visual comparison |
 | Audio | Original cow bank reached Playing with advancing progress through native UI | Audible/spatial quality and more devices/tracks |
 | Simulation and script VM | Shared code runs | Compare supported native commands and timing on multiple scenes |
 | Input | Basic camera/hand and touch verified | Native hotkeys, focus/capture, full interaction comparison |
@@ -59,4 +59,9 @@ Replaced the 64-matrix vertex uniform array with an RGBA32F texture palette. Thi
 
 ## Clean native launch and island coverage
 
-Browser smoke tests additionally loaded Land5 and LandT through the original menu without console errors. Added `?native=1` for an OpenBlack startup without Shade task polling, save restoration, selection or camera presets. `?level=Land4.txt` also selects native mode; levels are restricted to the supported story/demo allowlist and invalid input falls back to Land1. This makes startup comparisons reproducible. Regression tests cover level validation and isolation of task saves, updates, polling and Citadel exit. A clean Land4 startup currently settles to a ground-close browser view; native camera timing/input comparison is an open acceptance failure, not a parity success. The public Railway package was still reporting source revision c535fd22 during this check, so latest deployment is not yet confirmed.
+Browser smoke tests additionally loaded Land5 and LandT through the original menu without console errors. Added `?native=1` for an OpenBlack startup without Shade task polling, save restoration, selection or camera presets. `?level=Land4.txt` also selects native mode; levels are restricted to the supported story/demo allowlist and invalid input falls back to Land1. This makes startup comparisons reproducible. Regression tests cover level validation and isolation of task saves, updates, polling and Citadel exit. A clean Land4 startup settles to a ground-close browser view. A longer Windows run (18,000 frames) also settled to a ground-close view, so this is shared behavior rather than evidence of a browser-only camera regression. Exact timing/input and image comparison remains open. The public Railway package was still reporting source revision c535fd22 during this check, so latest deployment is not yet confirmed.
+
+
+## Matched-duration and sprite follow-up
+
+A Windows Land4 run exited successfully after 18,000 frames and produced `.local/native-land4-long.png`; it shows the same ground-close class of view as the browser after settling. The earlier 600-frame screenshot was too early to establish a discrepancy. In the original Citadel, turning Sprites off removed the bright lamp glow beside the main door; turning it back on restored the glow. No browser console errors appeared. Local routes `/`, `/engine-probe/`, `/healthz` and `/engine/openblack.html?native=1` returned HTTP 200. Railway had advanced to the Citadel package (manifest source 5bf8001e) but clean-launch deployment was still pending at the last check. Native source stubs, exact input/render comparisons, more audio/devices and performance remain unresolved parity gates.
