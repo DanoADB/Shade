@@ -105,6 +105,27 @@
     for(const id of ['village','closeup','villager'])document.getElementById(id).disabled = true;
     document.getElementById('status').textContent = 'Island loaded · use OpenBlack menus · reload to return to the Shade task';
   };
+  Module.shadeStop = reason => {
+    islandChanged = true;panel.hidden = true;marker.hidden = true;
+    if(Module.mobileControls)Module.mobileControls.stop();
+    for(const id of ['village','closeup','villager','touch-toggle'])document.getElementById(id).disabled = true;
+    document.querySelectorAll('[data-control]').forEach(button=>button.disabled=true);
+    document.getElementById('status').textContent = reason;
+    document.getElementById('restart').hidden = false;
+  };
+  document.getElementById('restart').onclick = () => location.reload();
+  Module.canvas.addEventListener('webglcontextlost', event => {
+    event.preventDefault();cancel();
+    Module.shadeStop('Graphics interrupted. Reload to restore the engine.');
+    if(Module._shade_pause_loop)Module._shade_pause_loop();
+  });
+  Module.canvas.addEventListener('webglcontextrestored', () => Module.shadeStop('Graphics restored. Reload to rebuild the scene.'));
+  Module.shadeTestContextLoss = () => {
+    const gl=Module.canvas.getContext('webgl2'),extension=gl && gl.getExtension('WEBGL_lose_context');
+    if(!extension){Module.print('Graphics recovery test unavailable on this device.');return;}
+    setTimeout(()=>extension.loseContext(),0);
+    setTimeout(()=>extension.restoreContext(),500);
+  };
   setInterval(() => {
     if (islandChanged || document.getElementById('status').textContent !== 'Running...' || document.hidden) return;
     if (!started) {

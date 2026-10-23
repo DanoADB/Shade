@@ -14,11 +14,11 @@ Target: the implemented behavior of the native OpenBlack checkout in Shade, not 
 | Offscreen render targets | Reflection, footprints and mesh preview implemented | More scene/format and resize coverage |
 | Lines and overlays | Scene/mesh bounding boxes, paths and streams verified | Compare remaining overlays against native |
 | Sprites | Native billboard/additive shader and entity pass implemented | Visual verification of glow/bookmark cases |
-| Audio | Compiles | Browser gesture unlock, real playback and spatial controls |
+| Audio | Original cow bank reached Playing with advancing progress through native UI | Audible/spatial quality and more devices/tracks |
 | Simulation and script VM | Shared code runs | Compare supported native commands and timing on multiple scenes |
 | Input | Basic camera/hand and touch verified | Native hotkeys, focus/capture, full interaction comparison |
-| Storage | Shade task checkpoint works | Native-supported persistence behavior; this is not full world saving |
-| Browser lifecycle | Partial | Context recovery, resize, memory/frame-time and clean launch tests |
+| Storage | Shade task checkpoint works; native SAVE_GAME_IN_SLOT remains a source stub | Further native-supported file-write paths; no full world-save claim |
+| Browser lifecycle | Quit and explicit graphics recovery verified; resize implemented | Memory/frame-time, clean profile and cross-device tests |
 | Deployment | Packaged engine pushed | Verify latest hosted artifacts and another device |
 
 Existing native gaps include unimplemented script commands, incomplete creature/gameplay behavior and unverified original campaign progression. These must remain distinguished from browser-specific omissions. Shade wood/food tasks are additions and are not evidence of native parity.
@@ -40,3 +40,7 @@ Ported the native terrain bump/detail shading, original ground decals, height-ma
 ## Inspectors, overlays and capture checkpoint
 
 Implemented offscreen DrawMesh with native submesh filtering and caller-provided bone palettes, plus bounding-box drawing. ImGui framebuffer previews use OpenGL UV orientation. The native MeshPack Viewer displayed the original dummy mesh texture and red box, while scene bounding boxes, footpaths and streams rendered through native view toggles. Added the native billboard sprite/tint pass; specific sprite visuals remain unverified. Capture now downloads a PNG from the completed engine canvas; the resulting screenshot.png was opened and visually checked. HTML task controls are outside the engine canvas and are not part of that native capture. WASM and native regression builds passed; no browser console errors appeared during these checks.
+
+## Audio and lifecycle checkpoint
+
+The native Audio Player selected bcow.sad, decoded a sound, and displayed Playing with advancing progress (17 percent observed) without console errors. This verifies the running playback path, not an independent audible-quality assessment. SDK OpenAL already resumes its Web Audio context on interaction. Browser Quit now stops task polling/held controls before engine services are destroyed. Graphics context loss pauses the engine and exposes an explicit reload control; restoration rebuilds through a page restart rather than reusing invalid GPU handles. The native Debug/View menu includes a recovery diagnostic. Simulated loss/restoration, reload and native Quit passed in-browser; lifecycle/input tests and WASM/native builds passed.

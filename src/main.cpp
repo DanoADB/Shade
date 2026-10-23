@@ -236,6 +236,7 @@ int main(int argc, char* argv[]) noexcept
 			    auto* runningGame = static_cast<openblack::Game*>(context);
 			    if (!runningGame->Frame())
 			    {
+				    EM_ASM({if(Module.shadeStop)Module.shadeStop('Engine stopped. Reload to start again.');});
 				    emscripten_cancel_main_loop();
 				    delete runningGame;
 			    }
@@ -311,6 +312,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int shade_resize(int width, int height)
 #include <glm/geometric.hpp>
 #include "BrowserGameplay.h"
 #include "Debug/DebugGuiInterface.h"
+extern "C" EMSCRIPTEN_KEEPALIVE void shade_pause_loop(){emscripten_pause_main_loop();}
 static openblack::browser::Gameplay& BrowserGameplay()
 {
     static openblack::browser::Gameplay gameplay;

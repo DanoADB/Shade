@@ -10,15 +10,17 @@ const elements=new Map();
 const get=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
 const buttons=new Map([2,3,7,8].map(code=>[code,element()]));
 const created=[];
-const document={hidden:false,getElementById:get,addEventListener(){},createElement(){
+const cameraButtons=[element()];
+const document={hidden:false,getElementById:get,addEventListener(){},querySelectorAll(){return cameraButtons;},createElement(){
   const el=element();el.querySelector=selector=>buttons.get(Number(selector.match(/\d+/)[0]));created.push(el);return el;
 }};
 const canvas=element(),calls=[];let now=0,tick;
 const restored=[],stored=new Map();
 const frames=[];
-const Module={canvas,_shade_gameplay:(...args)=>calls.push(args),_shade_gameplay_restore:(...args)=>{restored.push(args);return 1;}};
+let paused=0,stopped=0,reloaded=0;
+const Module={canvas,mobileControls:{stop(){stopped++;}},_shade_pause_loop(){paused++;},_shade_gameplay:(...args)=>calls.push(args),_shade_gameplay_restore:(...args)=>{restored.push(args);return 1;}};
 vm.runInNewContext(fs.readFileSync(require.resolve('../gameplay.js'),'utf8'),{
-  document,Module,localStorage:{getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)},
+  document,Module,location:{reload(){reloaded++;}},localStorage:{getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)},
   window:{addEventListener(){}},requestAnimationFrame:fn=>frames.push(fn),performance:{now:()=>now},setInterval(fn){tick=fn;},Map,Math,Number
 });
 const event=(pointerId,x=220,y=140)=>({pointerId,clientX:x,clientY:y,button:0});
@@ -60,4 +62,11 @@ tick();calls.pop();assert.equal(restored.length,7,'Restore only runs once');
 document.hidden=true;tick();assert.equal(calls.length,0,'Do not poll a hidden page');
 document.hidden=false;Module.shadeMapChanged();tick();assert.equal(calls.length,0,'Do not apply Land1 task state after native island switching');
 assert.equal(created[0].hidden,true);assert.equal(get('village').disabled,true);
+let prevented=false;
+send('webglcontextlost',{preventDefault(){prevented=true;}});
+assert.equal(prevented,true);assert.equal(paused,1);assert.equal(stopped,1);
+assert.equal(cameraButtons[0].disabled,true);assert.equal(get('restart').hidden,false);
+send('webglcontextrestored',{});assert.match(get('status').textContent,/Graphics restored/);
+get('restart').onclick();assert.equal(reloaded,1);
+tick();assert.equal(calls.length,0,'Stopped engine must not receive task polling');
 console.log('Gameplay tap, drag, pinch, cancellation, startup, save/resume and action availability passed.');

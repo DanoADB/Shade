@@ -378,6 +378,10 @@ bool Gui::ShowMenu() noexcept
 				ImGui::Checkbox("Bounding Boxes", &config.drawBoundingBoxes);
 				ImGui::Checkbox("Footpaths", &config.drawFootpaths);
 				ImGui::Checkbox("Streams", &config.drawStreams);
+#ifdef __EMSCRIPTEN__
+                if(ImGui::MenuItem("Test browser graphics recovery"))
+                    EM_ASM({if(Module.shadeTestContextLoss)Module.shadeTestContextLoss();});
+#endif
 
 				ImGui::EndMenu();
 			}
