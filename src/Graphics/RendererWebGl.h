@@ -340,7 +340,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         if(desc.drawSky && Locator::skySystem::has_value())DrawSky(*desc.camera);
         if(desc.drawWater && Locator::oceanSystem::has_value())DrawWater(*desc.camera);
         glUseProgram(_program); glBindVertexArray(_vao);
-        glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY,static_cast<GLuint>(Locator::terrainSystem::value().GetAlbedoArray().handle.id));
         glUniform1i(glGetUniformLocation(_program,"materials"),0);
@@ -366,6 +366,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         }
         const auto matrix=desc.camera->GetViewProjectionMatrix(Camera::Projection::Normal);
         glUniformMatrix4fv(glGetUniformLocation(_program,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
+        glEnable(GL_CULL_FACE);glFrontFace(GL_CCW);glCullFace(desc.viewId==RenderPass::Reflection?GL_FRONT:GL_BACK);
         if(desc.drawIsland) for (const auto& block: Locator::terrainSystem::value().GetBlocks()) {
             const auto& buffer=block.GetMesh().GetVertexBuffer();
             if (!buffer.handle.id) continue;
@@ -382,6 +383,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
             glDrawArrays(GL_TRIANGLES,0,buffer.vertexCount);
         }
         if (!_modelsReported) emscripten_log(EM_LOG_CONSOLE,"Terrain GL error: 0x%x",glGetError());
+        glDisable(GL_CULL_FACE);
         glUseProgram(_objectProgram);
         glUniform1f(glGetUniformLocation(_objectProgram,"skyType"),skyType);
         glUniform4fv(glGetUniformLocation(_objectProgram,"islandExtent"),1,glm::value_ptr(extentVector));
@@ -432,14 +434,14 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         }
     }
 	void Frame() noexcept final {
-        glBindFramebuffer(GL_FRAMEBUFFER,0);if(Locator::debugGui::has_value())Locator::debugGui::value().Draw(nullptr,nullptr);
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
         if(!_screenshotName.empty()){
             EM_ASM({const name=UTF8ToString($0);Module.canvas.toBlob(blob=>{
                 if(!blob){console.error('Screenshot encoding failed');return;}
                 const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;link.click();
                 setTimeout(()=>URL.revokeObjectURL(url),1000);
             },'image/png');},_screenshotName.c_str());_screenshotName.clear();
-        }
+        }else if(Locator::debugGui::has_value())Locator::debugGui::value().Draw(nullptr,nullptr);
     }
 	void RequestScreenshot(const std::filesystem::path& path) noexcept final {
         if(path.extension()==".png")_screenshotName=path.filename().string();
@@ -597,7 +599,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
 private:
     void DrawLines(const Mesh* mesh,const glm::mat4& projection,const glm::mat4& model) const noexcept {
         if(!mesh || !mesh->HasVertexBuffer())return;
-        glUseProgram(_lineProgram);glDepthMask(GL_FALSE);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glUseProgram(_lineProgram);glDepthMask(GL_TRUE);glDisable(GL_BLEND);
         glUniformMatrix4fv(glGetUniformLocation(_lineProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(projection));
         glUniformMatrix4fv(glGetUniformLocation(_lineProgram,"model"),1,GL_FALSE,glm::value_ptr(model));
         const auto& vertices=mesh->GetVertexBuffer();glBindBuffer(GL_ARRAY_BUFFER,vertices.handle.id);
@@ -632,7 +634,7 @@ private:
         const auto& target=island.GetFootprintFramebuffer();
         if(!BindTarget(target))return;
         glViewport(0,0,target.resolution.x,target.resolution.y);glDisable(GL_SCISSOR_TEST);
-        glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT);glDisable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);
+        glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT);glDisable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);glFrontFace(GL_CCW);glCullFace(GL_BACK);
         glEnable(GL_BLEND);glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
         glBindVertexArray(_vao);glUseProgram(_footprintProgram);glActiveTexture(GL_TEXTURE0);
         const auto matrix=island.GetOrthoProj()*island.GetOrthoView();
@@ -779,7 +781,7 @@ private:
                 glUniform1f(glGetUniformLocation(_objectProgram,"alphaCutoff"),primitive.thresholdAlpha ? primitive.alphaCutoutThreshold : 0.0f);
                 glDepthMask(primitive.depthWrite ? GL_TRUE : GL_FALSE);
                 if(primitive.blend!=L3DSubMesh::Primitive::BlendMode::Disabled) {
-                    glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,primitive.blend==L3DSubMesh::Primitive::BlendMode::Additive ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA);
+                    glEnable(GL_BLEND);glBlendFuncSeparate(GL_SRC_ALPHA,primitive.blend==L3DSubMesh::Primitive::BlendMode::Additive ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
                 }else glDisable(GL_BLEND);
                 glDrawElements(GL_TRIANGLES,primitive.indicesCount,GL_UNSIGNED_SHORT,reinterpret_cast<void*>(primitive.indicesOffset*sizeof(uint16_t)));
                 if(!_modelsReported && !_objectErrorReported) {
