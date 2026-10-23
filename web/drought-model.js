@@ -66,5 +66,35 @@
       }
     }
   }
-  return {Drought};
+  const SAVE_KEY='shade.drought.v1';
+  const phases={idle:3,care:18,explore:20,rest:12,channel:26,rain:18};
+  const jobs=['hauling water','tending crops','protecting trees'];
+  function decodeSave(text){
+    if(typeof text!=='string'||text.length>16000)throw new Error('Invalid save');
+    const save=JSON.parse(text),s=save&&save.state;
+    if(save.format!=='shade-drought'||save.version!==1||!s||typeof s!=='object')throw new Error('Unsupported save');
+    const range=(n,min,max)=>typeof n==='number'&&Number.isFinite(n)&&n>=min&&n<=max;
+    const integer=(n,min,max)=>Number.isInteger(n)&&range(n,min,max);
+    const member=(v,values)=>values.includes(v);
+    if(!integer(save.god,0,2)||typeof save.follow!=='boolean'||!integer(s.seed,0,4294967295)||!range(s.time,0,180.25))throw new Error('Invalid run');
+    for(const k of ['water','crops','forest','energy','bond','belief','confidence'])if(!range(s[k],0,100))throw new Error('Invalid village');
+    for(const k of ['spring','channel','feedback'])if(typeof s[k]!=='boolean')throw new Error('Invalid flags');
+    if(s.channel&&!s.spring)throw new Error('Invalid channel');
+    if(!range(s.rain,0,65)||!integer(s.deliveries,0,20)||!range(s.cooldown,0,5)||!range(s.feedbackUntil,0,193)||!member(s.phase,Object.keys(phases))||s.duration!==phases[s.phase]||!range(s.elapsed,0,s.duration)||!member(s.last,['',...Object.keys(phases).filter(p=>p!=='idle')])||!member(s.urge,['','care','explore','rest','rain'])||!member(s.outcome,['','won','lost']))throw new Error('Invalid action');
+    if(!s.habits||!['care','explore','rest'].every(k=>range(s.habits[k],.15,4)))throw new Error('Invalid learning');
+    const model=new Drought();
+    if(!Array.isArray(s.workers)||s.workers.length!==3||!s.workers.every((w,i)=>w&&w.name===model.workers[i].name&&member(w.job,jobs)&&range(w.progress,0,1)&&integer(w.cycles,0,9)))throw new Error('Invalid workers');
+    if(!Array.isArray(s.events)||s.events.length>5||!s.events.every(e=>e&&integer(e.time,0,181)&&e.time<=s.time&&typeof e.text==='string'&&e.text.length<=300))throw new Error('Invalid history');
+    // Copy only known fields; saved objects cannot replace methods or prototypes.
+    for(const k of Object.keys(model))if(!['habits','workers','events'].includes(k))model[k]=s[k];
+    model.habits={care:s.habits.care,explore:s.habits.explore,rest:s.habits.rest};
+    model.workers=s.workers.map(w=>({name:w.name,job:w.job,progress:w.progress,cycles:w.cycles}));
+    model.events=s.events.map(e=>({time:e.time,text:e.text}));
+    return {model,god:save.god,follow:save.follow};
+  }
+  function encodeSave(model,god,follow){
+    const text=JSON.stringify({format:'shade-drought',version:1,god,follow,state:model});
+    decodeSave(text);return text;
+  }
+  return {Drought,SAVE_KEY,encodeSave,decodeSave};
 });

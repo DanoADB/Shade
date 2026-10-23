@@ -7,6 +7,7 @@ inline float droughtRain=0,droughtDryness=0;
 inline std::vector<GroundVertex> droughtGround;
 inline unsigned droughtGroundRevision=0;
 inline uint32_t droughtCreatureMesh=0;
+void RestoreDroughtCounters(int deliveries);
 int SwapDroughtGod(int selection);
 void AnimateDroughtCreature(int phase,float progress,float time,int paused,int deliveries);
 const std::vector<glm::mat4>& SampleDroughtCreature();

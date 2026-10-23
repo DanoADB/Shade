@@ -89,6 +89,7 @@ class DroughtScene {
         return 1;
     }
 public:
+    void RestoreCounters(int deliveries){lastDelivery=animationDeliveries=deliveries;happyUntil=wakeUntil=castUntil=0;}
     int SwapGod(int selection){
         auto& registry=Locator::entitiesRegistry::value();
         if(creature==entt::null||!registry.Valid(creature))return 0;
@@ -222,6 +223,7 @@ public:
 namespace openblack::browser {
 static DroughtScene& Scene(){static DroughtScene scene;return scene;}
 int RunDrought(int phase,float progress,int deliveries,int focus,int reset){return Scene().Run(phase,progress,deliveries,focus,reset);}
+void RestoreDroughtCounters(int deliveries){Scene().RestoreCounters(deliveries);}
 int SwapDroughtGod(int selection){return Scene().SwapGod(selection);}
 void RunDroughtWorker(int index,int job,float progress){Scene().Workers(index,job,progress);}
 void AnimateDroughtCreature(int phase,float progress,float time,int paused,int deliveries){Scene().Animate(phase,progress,time,paused,deliveries);}

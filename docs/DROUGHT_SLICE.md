@@ -39,6 +39,16 @@ The standalone drought geometry check covers discovery visibility, partial/compl
 
 Cow, Rhino and Sheep load their own original animation banks (160, 160 and 160 unique named clips). Eleven action clips cover standing, walking, drinking, channel work, sleep/wake, rain casting and celebration. Sparse channels use quaternion interpolation, short transitions and in-place root travel; gait follows distance travelled. Ground contact correction offsets the whole animated body; it is not per-foot terrain IK. All gods are normalized to an eleven-metre standing height for scenario presentation. The bucket still needs a bone attachment.
 
-Use **Their god** to swap while active or paused, and **Follow creature** to keep it framed. Switching does not reset village resources, workers, scenario time or learning; failure leaves the previous selection active. Begin again retains the chosen god but resets the scenario. Reload does not yet preserve either the run or choice. Species currently share scenario rules and do not have separate personalities or balance.
+Use **Their god** to swap while active or paused, and **Follow creature** to keep it framed. Switching does not reset village resources, workers, scenario time or learning; failure leaves the previous selection active. Begin again retains the chosen god but resets the scenario. Reload restores the saved run and god, paused until Resume. Species currently share scenario rules and do not have separate personalities or balance.
 
 Synthetic animation tests and original-asset sampling cover all three rigs. Browser standing poses and live swaps were checked; not every action on every rig has received visual acceptance. See [the functionality audit](FUNCTIONALITY_AUDIT.md) for evidence, limits and ordered development gates.
+
+## Save and resume
+
+The drought scenario autosaves every two seconds and after teaching, god changes, pause/follow changes, and page hiding/leaving. **Save game** writes an immediate checkpoint. Reload automatically restores it, paused; press **Resume** to continue. Time away does not advance the simulation. **Begin again** replaces the saved run with a fresh season while retaining the selected god.
+
+The versioned checkpoint includes god choice, follow view, deterministic random state, village water/crops/forest, faith, energy, confidence, bond, spring/channel/rain state, deliveries, in-flight action and progress, reinforcement/cooldown windows, learned habits, and each worker's job/progress/completed cycles. Restored delivery counters do not replay the village's gift celebration. Scene props and waterworks rebuild from this state instead of serializing engine entities.
+
+Saves are local to this browser and site address; localhost and Railway have separate saves. This is one drought save slot, not a full native world or cross-device/cloud save. Corrupt or unsupported saves are retained without automatic overwrite; Save game or Begin again explicitly replaces them. Storage failures display a notice and leave the current session playable.
+
+`node web/tests/drought-save.test.cjs` checks deterministic continuation at every quarter-second of a guided run, action/worker completion boundaries, all gods, restored learning and progress, paused startup, fresh-season replacement, invalid data, storage failures, failed god loading, safe history rendering and page-hide persistence.
