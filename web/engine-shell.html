@@ -8,12 +8,20 @@
 <main id="stage"><canvas id="canvas" tabindex="0" aria-label="Island. Drag to move, pinch to zoom, tap to point the god hand." oncontextmenu="event.preventDefault()"></canvas>
 <div id="touch-controls" hidden><span class="hint">Drag to move · Pinch to zoom · Tap to point</span><div class="pad" role="group" aria-label="Move camera"><button class="up" data-control="2" aria-label="Move forward">↑</button><button class="left" data-control="0" aria-label="Move left">←</button><button class="down" data-control="3" aria-label="Move backward">↓</button><button class="right" data-control="1" aria-label="Move right">→</button></div><div class="lens" role="group" aria-label="View controls"><button data-control="8" aria-label="Zoom in">+</button><button data-control="9" aria-label="Zoom out">−</button><button data-control="4" aria-label="Rotate left">↶</button><button data-control="5" aria-label="Rotate right">↷</button><button data-control="6" aria-label="Tilt up">⌃</button><button data-control="7" aria-label="Tilt down">⌄</button></div></div></main><details><summary>Details</summary><textarea id="output" readonly aria-label="Engine log"></textarea></details>
 <script>
+const launchOptions = (() => {
+ const query = new URLSearchParams(location.search);
+ const levels = ['Land1.txt','Land2.txt','Land3.txt','Land4.txt','Land5.txt','LandT.txt','demo2.txt'];
+ const requested = query.get('level');
+ const level = levels.find(name => name.toLowerCase() === (requested || '').toLowerCase());
+ return {level: level || 'Land1.txt', native: query.get('native') === '1' || !!level};
+})();
 var Module = {
+ shadeNative: launchOptions.native,
  canvas: document.getElementById('canvas'),
- arguments: ['-g','/game','--start-level','Land1.txt','-l','stdout'],
+ arguments: ['-g','/game','--start-level',launchOptions.level,'-l','stdout'],
  print: line => { const log=document.getElementById('output'); log.value+=line+'\n';log.scrollTop=log.scrollHeight; },
  printErr: line => Module.print(line),
- setStatus: text => { if(text) document.getElementById('status').textContent=text; if(text==='Running...'){document.getElementById('village').disabled=false;document.getElementById('closeup').disabled=false;document.getElementById('villager').disabled=false;if(Module.mobileControls)Module.mobileControls.ready();} },
+ setStatus: text => { if(text) document.getElementById('status').textContent=text; if(text==='Running...'){for(const id of ['village','closeup','villager'])document.getElementById(id).disabled=Module.shadeNative;if(Module.mobileControls)Module.mobileControls.ready();} },
  onAbort: reason => Module.shadeStop ? Module.shadeStop('Engine stopped: '+reason) : Module.setStatus('Engine stopped: '+reason),
  onExit: code => Module.setStatus('Engine exited ('+code+'). See log below.'),
  preRun: [function() {
@@ -79,6 +87,7 @@ window.addEventListener('unhandledrejection', event=>Module.setStatus('Engine er
 document.getElementById('village').onclick=()=>{if(Module._shade_village_view)Module._shade_village_view(0);Module.canvas.focus();};
 document.getElementById('closeup').onclick=()=>{if(Module._shade_village_view)Module._shade_village_view(1);Module.canvas.focus();};
 document.getElementById('villager').onclick=()=>{if(Module._shade_villager_view)Module._shade_villager_view();Module.canvas.focus();};
+if(Module.shadeNative)for(const id of ['village','closeup','villager'])document.getElementById(id).hidden=true;
 Module.canvas.width=1280;Module.canvas.height=720;
 </script>
 <script src="mobile-controls.js"></script><script src="gameplay.js"></script>

@@ -14,7 +14,7 @@
   const marker = document.createElement('div');
   marker.id = 'selection-marker'; marker.hidden = true; marker.setAttribute('aria-hidden', 'true');
   document.getElementById('stage').append(marker);
-  function action(code, x = 0, y = 0) { if (Module._shade_gameplay) Module._shade_gameplay(code, x, y); }
+  function action(code, x = 0, y = 0) { if (!islandChanged && !templeActive && Module._shade_gameplay) Module._shade_gameplay(code, x, y); }
   function showTask(show) {
     document.getElementById('task-body').hidden = !show;
     const toggle = document.getElementById('task-toggle');
@@ -24,6 +24,7 @@
   document.getElementById('task-toggle').addEventListener('click', () => showTask(document.getElementById('task-body').hidden));
   const saveKey = 'shade-land1-village-task-v1';
   Module.shadeGameplaySave = json => {
+    if (islandChanged || templeActive) return;
     try { localStorage.setItem(saveKey, json); document.getElementById('save-status').textContent = 'Progress saved on this browser. Carried resources return on reload.'; }
     catch (_) { document.getElementById('save-status').textContent = 'Saving unavailable. Keep this page open to retain progress.'; }
   };
@@ -50,6 +51,7 @@
     }
   });
   Module.shadeGameplayUpdate = state => {
+    if (islandChanged || templeActive) return;
     panel.hidden = false;
     const set = (id, text) => { const element = document.getElementById(id); if (element.textContent !== text) element.textContent = text; };
     set('wood-progress', `Wood delivered: ${Math.min(state.delivered, 30)} / 30${state.delivered >= 30 ? ' · Complete' : ''}${state.carrying && !state.foodHeld ? ' · Carrying 10 wood' : ''}`);
@@ -99,7 +101,7 @@
   window.addEventListener('blur', cancel);
   document.addEventListener('visibilitychange', cancel);
   let started = false;
-  let islandChanged = false;
+  let islandChanged = !!Module.shadeNative;
   let templeActive = false;
   Module.shadeTempleChanged = active => {
     templeActive = active;

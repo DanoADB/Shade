@@ -1,11 +1,11 @@
 {
-  "source_revision": "5bf8001ec66c8ceb3304da71add81285a267fefb",
+  "source_revision": "3c9fcc57736a13694078924fbc8ac78f6630a767",
   "engine": "openblack-webgl2",
   "original_assets_bundled": true,
   "files": {
     "openblack.html": {
-      "bytes": 9542,
-      "sha256": "96aba8ce5b41630671bb448aa0f1549066a115a073fd2b15fdc4095eab3b34ac"
+      "bytes": 9945,
+      "sha256": "62996264a9d918d7f5f7c7d5e999a135fa954c0a37e2b1d27dbab1aef6005e16"
     },
     "openblack.js": {
       "bytes": 277786,
@@ -20,8 +20,8 @@
       "sha256": "9124212f8f96e5005855b4cdc5261c3adf8e19bbd3f738cd03c0ffa4dd2c1778"
     },
     "gameplay.js": {
-      "bytes": 9824,
-      "sha256": "f652d1aeb9c7651b64de5fdaf32190587d62c3d91b9babdf84bf93a6efa282c3"
+      "bytes": 10114,
+      "sha256": "3c3babaed3854cb4fcc2f1d22a22da48d4a16570c60e5e0a1aa62b97c11582ec"
     }
   }
 }
