@@ -7,6 +7,8 @@ const document={addEventListener(){},hidden:false,head:el(),querySelectorAll(){r
 vm.runInNewContext(fs.readFileSync(require.resolve('../drought.js'),'utf8'),{document,Module,ShadeDrought:{Drought},performance:{now:()=>now},setInterval(fn){tick=fn;},location:{reload(){reloads++;}},Math});
 assert(get('drought-focus').disabled);get('status').textContent='Loading';tick();assert.equal(calls.length,0);
 get('status').textContent='Running...';tick();assert.equal(calls.length,2);assert(!get('drought-focus').disabled);
+get('drought-focus').onclick();tick();assert.equal(calls.at(-1)[3],2,'Find creature requests a close view');
+get('drought-focus').onclick();tick();assert.equal(calls.at(-1)[3],1,'Village view restores wide framing');
 now+=1000;tick();assert.match(get('drought-intent').textContent,/179 seconds/);
 get('drought-pause').onclick();now+=1000;tick();assert.match(get('drought-intent').textContent,/179 seconds/);
 get('drought-pause').onclick();document.hidden=true;now+=60000;tick();document.hidden=false;now+=100;tick();assert.match(get('drought-intent').textContent,/179 seconds/,'Background time must not consume the scenario');

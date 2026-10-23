@@ -10,7 +10,7 @@
   const weather=document.createElement('div');weather.id='drought-weather';document.getElementById('stage').append(weather);
   const hint=document.createElement('div');hint.id='drought-hint';hint.textContent='A village beneath a silent sky. Watch what the creature chooses, then respond to the lesson it learns.';document.getElementById('stage').append(hint);
   document.querySelector('header b').textContent='Shade · The unseen';
-  let model=new ShadeDrought.Drought(),last=performance.now(),started=false,paused=false,stopped=false,temple=false,focus=0;
+  let model=new ShadeDrought.Drought(),last=performance.now(),started=false,paused=false,stopped=false,temple=false,focus=0,closeup=false;
   const $=id=>document.getElementById(id);
   const codes={idle:0,care:1,explore:2,rest:3,channel:4,rain:5};
   const names={idle:'Watching the village',care:'Carrying water to the village',explore:'Exploring the watershed',rest:'Resting',channel:'Opening a shared watercourse',rain:'Gathering the courage to call rain'};

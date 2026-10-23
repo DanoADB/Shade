@@ -1,5 +1,5 @@
 {
-  "source_revision": "fe35e5a25623a4a4b76fc3916455d081373815a9",
+  "source_revision": "9b5f2ade524265ff0eb768c17c58474fd1ae6a95",
   "engine": "openblack-webgl2",
   "original_assets_bundled": true,
   "files": {
@@ -28,8 +28,8 @@
       "sha256": "d2804a63e10d179a14c7de70e2338e07aa13d09f5b1f1d9950f2735a58200804"
     },
     "drought.js": {
-      "bytes": 10403,
-      "sha256": "1ca65eedbca90a769d8d4bbba6168dc0a6b52aec2f8c3855493c52c8c0b7dc83"
+      "bytes": 10417,
+      "sha256": "884579f2dd2786c5f48e24d976c394490d9eebebda22255bb3f9d98d8bc73415"
     }
   }
 }
