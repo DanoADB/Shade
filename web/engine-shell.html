@@ -17,6 +17,7 @@ const launchOptions = (() => {
 })();
 var Module = {
  shadeNative: launchOptions.native,
+ shadeDecodeTextures: new URLSearchParams(location.search).get('textures') === 'decoded',
  canvas: document.getElementById('canvas'),
  arguments: ['-g','/game','--start-level',launchOptions.level,'-l','stdout'],
  print: line => { const log=document.getElementById('output'); log.value+=line+'\n';log.scrollTop=log.scrollHeight; },

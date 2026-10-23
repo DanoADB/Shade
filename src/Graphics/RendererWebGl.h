@@ -17,6 +17,7 @@
 #include "RendererInterface.h"
 #include "BlockTextureDecode.h"
 #include <GLES3/gl3.h>
+#include <GLES2/gl2ext.h>
 #include <emscripten/html5.h>
 #include <glm/gtc/type_ptr.hpp>
 #include "3D/LandBlock.h"
@@ -58,6 +59,8 @@ public:
             return nullptr;
         auto renderer = std::make_unique<RendererWebGl>();
         renderer->_context = context;
+        renderer->_compressedTextures = !EM_ASM_INT({return !!Module.shadeDecodeTextures;}) &&
+            emscripten_webgl_enable_extension(context,"WEBGL_compressed_texture_s3tc");
         const char* vertex = R"(#version 300 es
 layout(location=0) in vec3 position;
 layout(location=1) in vec4 light;
@@ -443,6 +446,8 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
             }
             emscripten_log(EM_LOG_CONSOLE,"Model batches: %zu entities, %zu trees; GL error 0x%x",
                 context.instancedDrawDescs.size(),context.treeInstancedDrawDescs.size(),glGetError());
+            emscripten_log(EM_LOG_CONSOLE,"BC textures: %zu GPU compressed, %zu decoded; %zu bytes vs %zu decoded bytes",
+                _compressedCount,_decodedCount,_compressedBytes,_decodedEquivalentBytes);
             _modelsReported=true;
         }
     }
@@ -561,7 +566,19 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
             if(format==TextureFormat::BlockCompression1 || format==TextureFormat::BlockCompression2 || format==TextureFormat::BlockCompression3) {
                 const size_t needed=((resolution.x+3)/4)*((resolution.y+3)/4)*(format==TextureFormat::BlockCompression1 ? 8 : 16);
                 if(memory.size()<needed) return nullptr;
-                rgba=detail::DecodeBlockCompressed(format,memory,resolution.x,resolution.y,1);
+                // DDS files can contain trailing mip levels; this renderer uses the base level only.
+                if(_compressedTextures){
+                    const GLenum storage=format==TextureFormat::BlockCompression1 ? GL_COMPRESSED_RGBA_S3TC_DXT1_EXT :
+                        format==TextureFormat::BlockCompression2 ? GL_COMPRESSED_RGBA_S3TC_DXT3_EXT : GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+                    glGenTextures(1,&handle);glBindTexture(GL_TEXTURE_2D,handle);
+                    glCompressedTexImage2D(GL_TEXTURE_2D,0,storage,resolution.x,resolution.y,0,needed,memory.data());
+                    const auto error=glGetError();
+                    if(error){
+                        emscripten_log(EM_LOG_WARN,"Compressed upload failed for %s (0x%x); decoding texture",name.c_str(),error);
+                        glDeleteTextures(1,&handle);handle=0;
+                    }else{++_compressedCount;_compressedBytes+=needed;_decodedEquivalentBytes+=count*4;}
+                }
+                if(!handle){rgba=detail::DecodeBlockCompressed(format,memory,resolution.x,resolution.y,1);++_decodedCount;}
             } else if(format==TextureFormat::BGRA4 && memory.size()>=count*2) {
                 rgba.resize(count*4);
                 for(size_t i=0;i<count;++i) {
@@ -579,6 +596,8 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
             if(!rgba.empty()) {
                 glGenTextures(1,&handle);glBindTexture(GL_TEXTURE_2D,handle);
                 glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,resolution.x,resolution.y,0,GL_RGBA,GL_UNSIGNED_BYTE,rgba.data());
+            }
+            if(handle){
                 const GLint sampling=filter==Filter::Linear ? GL_LINEAR : GL_NEAREST;
                 const GLint address=wrapping==Wrapping::Repeat ? GL_REPEAT : wrapping==Wrapping::MirroredRepeat ? GL_MIRRORED_REPEAT : GL_CLAMP_TO_EDGE;
                 glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,sampling);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,sampling);
@@ -819,6 +838,8 @@ private:
     }
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE _context {};
     GLuint _program {}, _objectProgram {}, _skyProgram {}, _waterProgram {}, _footprintProgram {}, _lineProgram {}, _spriteProgram {}, _spriteBuffer {}, _vao {}, _framebuffer {};
+    bool _compressedTextures{};
+    size_t _compressedCount{},_decodedCount{},_compressedBytes{},_decodedEquivalentBytes{};
     GLuint _boneTexture{};
     GLint _maxBoneHeight{};
     mutable unsigned _boneCapacity{1};

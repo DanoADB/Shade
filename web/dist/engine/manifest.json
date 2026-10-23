@@ -1,19 +1,19 @@
 {
-  "source_revision": "3c9fcc57736a13694078924fbc8ac78f6630a767",
+  "source_revision": "144ed5175df3a2bbc092066d8e81529923c79cbb",
   "engine": "openblack-webgl2",
   "original_assets_bundled": true,
   "files": {
     "openblack.html": {
-      "bytes": 9945,
-      "sha256": "62996264a9d918d7f5f7c7d5e999a135fa954c0a37e2b1d27dbab1aef6005e16"
+      "bytes": 10030,
+      "sha256": "dd7aa1900101441480c3e8b217ad76daed80dcd8ae031d9abd23ee346d51e6f7"
     },
     "openblack.js": {
-      "bytes": 277786,
-      "sha256": "eaf821b57f1294cc1d32856e78fb49faa98de8a3f5ca3b3a3f322cd2bcfd381c"
+      "bytes": 278728,
+      "sha256": "764c2067caec64b25ef4d6ef3d212c67796948ea5106854f52f7096612fafd7e"
     },
     "openblack.wasm": {
-      "bytes": 3850974,
-      "sha256": "0c45934cd849eacb93374121dd522b083b9030b67c9190337f1e6e0d61361f3a"
+      "bytes": 3851809,
+      "sha256": "682fce0da27235820c16daea074c8057f1c9c27fec017ee1b2bc21df68745b66"
     },
     "mobile-controls.js": {
       "bytes": 4295,
