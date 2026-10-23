@@ -448,6 +448,8 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
                 context.instancedDrawDescs.size(),context.treeInstancedDrawDescs.size(),glGetError());
             emscripten_log(EM_LOG_CONSOLE,"BC textures: %zu GPU compressed, %zu decoded; %zu bytes vs %zu decoded bytes",
                 _compressedCount,_decodedCount,_compressedBytes,_decodedEquivalentBytes);
+            emscripten_log(EM_LOG_CONSOLE,"R8 textures: %zu single-channel uploads, %zu bytes vs %zu expanded bytes",
+                _singleChannelCount,_singleChannelBytes,_singleChannelBytes*4);
             _modelsReported=true;
         }
     }
@@ -586,7 +588,12 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
                     rgba[i*4]=((pixel>>8)&15)*17;rgba[i*4+1]=((pixel>>4)&15)*17;
                     rgba[i*4+2]=(pixel&15)*17;rgba[i*4+3]=(pixel>>12)*17;
                 }
-            } else if((format==TextureFormat::R8 || format==TextureFormat::A8) && memory.size()>=count) {
+            } else if(format==TextureFormat::R8 && memory.size()>=count) {
+                // Keep height, bump and ocean alpha maps in the native single-channel format.
+                glGenTextures(1,&handle);glBindTexture(GL_TEXTURE_2D,handle);
+                glTexImage2D(GL_TEXTURE_2D,0,GL_R8,resolution.x,resolution.y,0,GL_RED,GL_UNSIGNED_BYTE,memory.data());
+                ++_singleChannelCount;_singleChannelBytes+=count;
+            } else if(format==TextureFormat::A8 && memory.size()>=count) {
                 rgba.resize(count*4);
                 for(size_t i=0;i<count;++i){rgba[i*4]=rgba[i*4+1]=rgba[i*4+2]=memory[i];rgba[i*4+3]=255;}
             } else if((format==TextureFormat::RGBA8 || format==TextureFormat::BGRA8) && memory.size()>=count*4) {
@@ -840,6 +847,7 @@ private:
     GLuint _program {}, _objectProgram {}, _skyProgram {}, _waterProgram {}, _footprintProgram {}, _lineProgram {}, _spriteProgram {}, _spriteBuffer {}, _vao {}, _framebuffer {};
     bool _compressedTextures{};
     size_t _compressedCount{},_decodedCount{},_compressedBytes{},_decodedEquivalentBytes{};
+    size_t _singleChannelCount{},_singleChannelBytes{};
     GLuint _boneTexture{};
     GLint _maxBoneHeight{};
     mutable unsigned _boneCapacity{1};
