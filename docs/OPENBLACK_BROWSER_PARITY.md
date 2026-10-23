@@ -5,8 +5,8 @@ Target: the implemented behavior of the native OpenBlack checkout in Shade, not 
 | Area | Browser status | Remaining acceptance work |
 |---|---|---|
 | Original data and Land1 startup | Land1 and native-menu switch to Land2 verified | Other supported levels and clean-profile startup |
-| Terrain materials | Partial | Bump maps, shore alpha, building footprints |
-| Village, trees, original hand | Verified basic rendering | Native material/lighting match, terrain deformation and tree sway |
+| Terrain materials | Native bump/detail, shore alpha and footprint passes implemented | Broader native pixel/scene comparison |
+| Village, trees, original hand | Original models, native lighting, terrain deformation and sway implemented | Wider model/material coverage and native visual comparison |
 | Packed villager animations | Implemented | Broader clip coverage and walking verification; native currently uses rest poses |
 | Sky | Original dome and nine-layer shader implemented; day/night verified | Broader alignment and scene comparisons |
 | Ocean | Original water textures and reflected-scene pass implemented; Land2 coast verified | Native visual comparison across time/alignment and views |
@@ -32,3 +32,7 @@ Vendored the matching Dear ImGui 1.92.9b OpenGL backend from the installed depen
 ## Ocean checkpoint
 
 Replaced empty browser framebuffer handles with sampled RGBA8 targets and optional depth/stencil textures. The main scene now renders the engine reflected camera into the ocean target before drawing the original six-index sea plane. Water uses the same diffuse/alpha/horizon mixing as the native shader, with OpenGL texture Y conventions. R8 texture inputs now upload, and terrain retains its shoreline alpha over the water. Land1 startup and Land2 switching/coast rendering passed; framebuffer and water GL checks returned zero and no console errors appeared. Reflection visuals still need broader native comparison. Render targets increase graphics memory use; profiling remains an acceptance gap.
+
+## Terrain and vegetation checkpoint
+
+Ported the native terrain bump/detail shading, original ground decals, height-map deformation for marked buildings/fields, tree anchoring/sway and native object/vegetation day-night lighting equations. Ground decals use an orthographic RGBA target with OpenGL texture orientation. Browser Land1 rendered 1,485 decal instances into a 3,584 by 3,328 target with GL error zero. Original building surrounds and conforming crop fields are visible; the World menu dims terrain and buildings at night. No console errors appeared. Larger scene/material comparisons and performance profiling remain required.

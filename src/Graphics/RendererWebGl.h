@@ -65,6 +65,8 @@ layout(location=5) in vec3 materialBlend;
 layout(location=6) in float waterAlpha;
 uniform mat4 viewProjection;
 uniform vec2 offset;
+uniform mat4 view;
+uniform vec4 islandExtent;
 out vec2 uv;
 out vec3 weights;
 flat out uvec3 first;
@@ -72,12 +74,16 @@ flat out uvec3 second;
 out vec3 blend;
 out float lighting;
 out float alpha;
+out float distanceToCamera;
+out vec2 footprintUv;
 void main() {
     vec3 world = position + vec3(offset.x, 0.0, offset.y);
     gl_Position = viewProjection * vec4(world, 1.0);
     uv = position.zx / 160.0;
     weights=weight; first=firstMaterial; second=secondMaterial;
     blend=materialBlend;lighting=light.r;alpha=waterAlpha;
+    distanceToCamera=(view*vec4(world,1.0)).z;
+    footprintUv=(world.xz-islandExtent.xy)/(islandExtent.zw-islandExtent.xy);
 })";
         const char* fragment = R"(#version 300 es
 precision highp float;
@@ -89,7 +95,13 @@ flat in uvec3 second;
 in vec3 blend;
 in float lighting;
 in float alpha;
+in float distanceToCamera;
+in vec2 footprintUv;
 uniform sampler2DArray materials;
+uniform sampler2D bumpMap;
+uniform sampler2D smallBump;
+uniform sampler2D footprint;
+uniform vec3 skyAndBump;
 out vec4 outputColor;
 void main() {
     if(alpha == 0.0) discard;
@@ -99,7 +111,12 @@ void main() {
         vec3 b=texture(materials,vec3(uv,float(second[i]))).rgb;
         color+=mix(a,b,blend[i])*weights[i];
     }
-    outputColor=vec4(color*clamp(lighting*2.0,0.5,1.0),alpha);
+    color*=mix(1.0,texture(bumpMap,uv).r*2.0,skyAndBump.y);
+    if(distanceToCamera<200.0)color*=1.0-texture(smallBump,uv*10.0).r*(1.0-distanceToCamera/200.0)*skyAndBump.z;
+    vec4 decal=texture(footprint,footprintUv);
+    color=mix(color,decal.rgb,decal.a);
+    color*=mix(0.25,clamp(lighting*2.0,0.5,1.0),skyAndBump.x/2.0);
+    outputColor=vec4(color,alpha);
 }
 )";
         renderer->_program=CompileProgram(vertex,fragment);
@@ -112,28 +129,51 @@ uniform mat4 viewProjection;
 uniform mat4 model;
 uniform mat4 bones[64];
 uniform int boneCount;
+uniform sampler2D heightMap;
+uniform vec4 islandExtent;
+uniform bool morphWithTerrain;
+uniform bool vegetation;
+uniform vec4 sway;
 out vec2 uv;
-out float shade;
+out vec3 worldPosition;
+out vec3 worldNormal;
 void main() {
     mat4 bone=mat4(1.0);
     if(joint.x>=0 && joint.x<boneCount) bone=bones[joint.x];
-    gl_Position=viewProjection*model*bone*vec4(position,1.0);
-    vec3 n=normalize(mat3(model*bone)*normal);
-    shade=0.5+0.5*max(dot(n,normalize(vec3(0.4,0.8,0.3))),0.0);
+    vec4 world=model*bone*vec4(position,1.0);
+    vec3 base=(model*vec4(0.0,0.0,0.0,1.0)).xyz;
+    if(vegetation){
+        vec2 direction=length(sway.xy)>0.0?normalize(sway.xy):vec2(0.0);
+        world.xz+=direction*sin(sway.z*0.08*sway.w)*position.y;
+    }
+    if(morphWithTerrain||vegetation){
+        vec2 point=vegetation?base.xz:world.xz;
+        vec2 sampleUv=(point-islandExtent.xy)/(islandExtent.zw-islandExtent.xy);
+        world.y+=textureLod(heightMap,sampleUv,0.0).r*170.85-base.y;
+    }
+    gl_Position=viewProjection*world;
+    worldPosition=world.xyz;worldNormal=normal;
     uv=texcoord;
 })";
         const char* objectFragment=R"(#version 300 es
 precision highp float;
 in vec2 uv;
-in float shade;
+in vec3 worldPosition;
+in vec3 worldNormal;
 uniform sampler2D diffuse;
 uniform bool textured;
 uniform float alphaCutoff;
+uniform float skyType;
+uniform bool vegetation;
 out vec4 outputColor;
 void main() {
     vec4 color=textured ? texture(diffuse,uv) : vec4(0.7,0.65,0.5,1.0);
     if(color.a<alphaCutoff) discard;
-    outputColor=vec4(color.rgb*shade,color.a);
+    float brightness=skyType/2.0;
+    float ambient=vegetation?brightness*0.25+0.75:brightness*0.25+0.25;
+    vec3 lightDirection=normalize(vec3(-4000.0,1300.0,-1435.0)-worldPosition);
+    float lighting=ambient+brightness*max(dot(worldNormal,lightDirection),0.0)*(vegetation?0.25:0.75);
+    outputColor=vec4(color.rgb*lighting,color.a);
 })";
         renderer->_objectProgram=CompileProgram(objectVertex,objectFragment);
         const char* skyVertex=R"(#version 300 es
@@ -193,7 +233,23 @@ void main(){
 }
 )";
         renderer->_waterProgram=CompileProgram(waterVertex,waterFragment);
-        if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram || !renderer->_waterProgram) return nullptr;
+        const char* footprintVertex=R"(#version 300 es
+layout(location=0) in vec2 position;
+layout(location=1) in vec2 texcoord;
+uniform mat4 viewProjection;
+uniform mat4 model;
+out vec2 uv;
+void main(){gl_Position=viewProjection*model*vec4(position.x,0.0,position.y,1.0);gl_Position.z=0.0;uv=texcoord;}
+)";
+        const char* footprintFragment=R"(#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D diffuse;
+out vec4 outputColor;
+void main(){outputColor=texture(diffuse,uv);}
+)";
+        renderer->_footprintProgram=CompileProgram(footprintVertex,footprintFragment);
+        if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram || !renderer->_waterProgram || !renderer->_footprintProgram) return nullptr;
         glGenVertexArrays(1,&renderer->_vao);
         glGenFramebuffers(1,&renderer->_framebuffer);
         emscripten_log(EM_LOG_CONSOLE,"Shade WebGL2 renderer initialized (original terrain, models, animations and sky)");
@@ -204,6 +260,7 @@ void main(){
         if (_objectProgram) glDeleteProgram(_objectProgram);
         if (_skyProgram) glDeleteProgram(_skyProgram);
         if (_waterProgram) glDeleteProgram(_waterProgram);
+        if (_footprintProgram)glDeleteProgram(_footprintProgram);
         if (_framebuffer)glDeleteFramebuffers(1,&_framebuffer);
         if (_vao) glDeleteVertexArrays(1,&_vao);
         if (_context > 0) emscripten_webgl_destroy_context(_context);
@@ -211,6 +268,7 @@ void main(){
 	[[nodiscard]] void* GetDevice() const noexcept final { return nullptr; }
 	void DrawScene(const DrawSceneDesc& desc) noexcept final {
         if ((desc.viewId != RenderPass::Main && desc.viewId != RenderPass::Reflection) || !desc.camera) return;
+        if(desc.viewId==RenderPass::Main && desc.drawIsland && Locator::terrainSystem::has_value())DrawFootprints();
         if(desc.viewId==RenderPass::Main && desc.drawWater && Locator::oceanSystem::has_value()) {
             const auto reflectedCamera=desc.camera->Reflect();
             auto reflected=desc;reflected.camera=reflectedCamera.get();reflected.viewId=RenderPass::Reflection;
@@ -238,6 +296,20 @@ void main(){
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY,static_cast<GLuint>(Locator::terrainSystem::value().GetAlbedoArray().handle.id));
         glUniform1i(glGetUniformLocation(_program,"materials"),0);
+        const auto& island=Locator::terrainSystem::value();
+        const auto& textures=Locator::resources::value().GetTextures();
+        const auto extent=island.GetExtent();
+        const auto extentVector=glm::vec4(extent.minimum,extent.maximum);
+        glUniform4fv(glGetUniformLocation(_program,"islandExtent"),1,glm::value_ptr(extentVector));
+        const auto view=desc.camera->GetViewMatrix(Camera::Interpolation::Current);
+        glUniformMatrix4fv(glGetUniformLocation(_program,"view"),1,GL_FALSE,glm::value_ptr(view));
+        const auto skyType=Locator::skySystem::value().GetCurrentSkyType();
+        glUniform3f(glGetUniformLocation(_program,"skyAndBump"),skyType,desc.bumpMapStrength,desc.smallBumpMapStrength);
+        const auto smallBump=textures.Contains(LandIslandInterface::k_SmallBumpTextureId)?textures.Handle(LandIslandInterface::k_SmallBumpTextureId)->handle.id:0;
+        const GLuint terrainTextures[]={GLuint(island.GetBump().handle.id),GLuint(smallBump),GLuint(island.GetFootprintFramebuffer().colorAttachment.id)};
+        const char* terrainNames[]={"bumpMap","smallBump","footprint"};
+        for(int i=0;i<3;++i){glActiveTexture(GL_TEXTURE1+i);glBindTexture(GL_TEXTURE_2D,terrainTextures[i]);glUniform1i(glGetUniformLocation(_program,terrainNames[i]),i+1);}
+        glActiveTexture(GL_TEXTURE0);
         if (!_reported) {
             const auto origin=desc.camera->GetOrigin(); const auto focus=desc.camera->GetFocus();
             emscripten_log(EM_LOG_CONSOLE,"Terrain: %zu blocks, vertex size %zu, camera %.2f %.2f %.2f -> %.2f %.2f %.2f",
@@ -263,6 +335,10 @@ void main(){
         }
         if (!_modelsReported) emscripten_log(EM_LOG_CONSOLE,"Terrain GL error: 0x%x",glGetError());
         glUseProgram(_objectProgram);
+        glUniform1f(glGetUniformLocation(_objectProgram,"skyType"),skyType);
+        glUniform4fv(glGetUniformLocation(_objectProgram,"islandExtent"),1,glm::value_ptr(extentVector));
+        glActiveTexture(GL_TEXTURE4);glBindTexture(GL_TEXTURE_2D,island.GetHeightMap().handle.id);
+        glUniform1i(glGetUniformLocation(_objectProgram,"heightMap"),4);glActiveTexture(GL_TEXTURE0);
         glUniformMatrix4fv(glGetUniformLocation(_objectProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
         const auto& context=Locator::rendereringSystem::value().GetContext();
         const auto& meshes=Locator::resources::value().GetMeshes();
@@ -273,14 +349,14 @@ void main(){
                 const auto& animation=context.instanceAnimations.at(instances.offset+i);
                 const auto time=animation.started<0 ? desc.time+animation.phase : uint32_t(std::max<int64_t>(0,
                     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()-animation.started));
-                DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),animation.clip,time);
+                DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),animation.clip,time,instances.morphWithTerrain);
             }
         }
         if(desc.drawVegetation) for(const auto& [id,instances]:context.treeInstancedDrawDescs) {
             if(!meshes.Contains(id)) continue;
             const auto mesh=meshes.Handle(id);
             for(uint32_t i=0;i<instances.count;++i)
-                DrawObject(*mesh,context.treeInstanceData.at(instances.offset+i).modelMatrix);
+                DrawObject(*mesh,context.treeInstanceData.at(instances.offset+i).modelMatrix,AnimId::Invalid,0,false,&context.treeInstanceData.at(instances.offset+i).swayParams);
         }
         glDepthMask(GL_TRUE);glDisable(GL_BLEND);
         glBindVertexArray(0);
@@ -431,6 +507,39 @@ void main(){
 	}
 
 private:
+    void DrawFootprints() const noexcept {
+        const auto& island=Locator::terrainSystem::value();
+        const auto& target=island.GetFootprintFramebuffer();
+        if(!BindTarget(target))return;
+        glViewport(0,0,target.resolution.x,target.resolution.y);glDisable(GL_SCISSOR_TEST);
+        glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT);glDisable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);
+        glEnable(GL_BLEND);glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+        glBindVertexArray(_vao);glUseProgram(_footprintProgram);glActiveTexture(GL_TEXTURE0);
+        const auto matrix=island.GetOrthoProj()*island.GetOrthoView();
+        glUniformMatrix4fv(glGetUniformLocation(_footprintProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
+        glUniform1i(glGetUniformLocation(_footprintProgram,"diffuse"),0);
+        const auto& context=Locator::rendereringSystem::value().GetContext();const auto& meshes=Locator::resources::value().GetMeshes();
+        unsigned count=0;
+        auto draw=[&](entt::id_type id,const auto& instances,bool tree){
+            if(!meshes.Contains(id))return;const auto mesh=meshes.Handle(id);
+            if(!mesh->ContainsLandscapeFeature()||mesh->GetFootprints().empty())return;
+            const auto& decal=mesh->GetFootprints().front();if(!decal.texture||!decal.texture->handle.id||!decal.mesh)return;
+            const auto& vertices=decal.mesh->GetVertexBuffer();
+            glBindTexture(GL_TEXTURE_2D,decal.texture->handle.id);glBindBuffer(GL_ARRAY_BUFFER,vertices.handle.id);
+            for(GLuint i=2;i<7;++i)glDisableVertexAttribArray(i);
+            glEnableVertexAttribArray(0);glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,vertices.strideBytes,nullptr);
+            glEnableVertexAttribArray(1);glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,vertices.strideBytes,reinterpret_cast<void*>(8));
+            for(uint32_t i=0;i<instances.count;++i){
+                const auto& model=tree?context.treeInstanceData.at(instances.offset+i).modelMatrix:context.instanceUniforms.at(instances.offset+i);
+                glUniformMatrix4fv(glGetUniformLocation(_footprintProgram,"model"),1,GL_FALSE,glm::value_ptr(model));
+                glDrawArrays(GL_TRIANGLES,0,vertices.vertexCount);++count;
+            }
+        };
+        for(const auto& [key,instances]:context.instancedDrawDescs)draw(key.meshId,instances,false);
+        for(const auto& [id,instances]:context.treeInstancedDrawDescs)draw(id,instances,true);
+        glDisable(GL_BLEND);glEnable(GL_DEPTH_TEST);
+        if(!_footprintsReported){emscripten_log(EM_LOG_CONSOLE,"Original terrain footprints: %u draws; target %ux%u; GL error 0x%x",count,target.resolution.x,target.resolution.y,glGetError());_footprintsReported=true;}
+    }
     bool BindTarget(const FrameBuffer& target) const noexcept {
         glBindFramebuffer(GL_FRAMEBUFFER,_framebuffer);
         glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,target.colorAttachment.id,0);
@@ -500,7 +609,10 @@ private:
             emscripten_log(EM_LOG_ERROR,"WebGL program: %s",log);glDeleteProgram(program);return 0; }
         return program;
     }
-    void DrawObject(const L3DMesh& mesh,const glm::mat4& model, AnimId clip=AnimId::Invalid, uint32_t time=0) const noexcept {
+    void DrawObject(const L3DMesh& mesh,const glm::mat4& model, AnimId clip=AnimId::Invalid, uint32_t time=0,bool morph=false,const glm::vec4* sway=nullptr) const noexcept {
+        glUniform1i(glGetUniformLocation(_objectProgram,"morphWithTerrain"),morph);
+        glUniform1i(glGetUniformLocation(_objectProgram,"vegetation"),sway!=nullptr);
+        if(sway)glUniform4fv(glGetUniformLocation(_objectProgram,"sway"),1,glm::value_ptr(*sway));
         const auto* palette=&mesh.GetBoneMatrices();
         std::vector<glm::mat4> posed;
         auto& animations=Locator::resources::value().GetAnimations();
@@ -555,9 +667,9 @@ private:
         }
     }
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE _context {};
-    GLuint _program {}, _objectProgram {}, _skyProgram {}, _waterProgram {}, _vao {}, _framebuffer {};
+    GLuint _program {}, _objectProgram {}, _skyProgram {}, _waterProgram {}, _footprintProgram {}, _vao {}, _framebuffer {};
 	bool _reported {}, _modelsReported {};
-    mutable bool _objectErrorReported {}, _animationReported {}, _skyReported {}, _waterReported {};
+    mutable bool _objectErrorReported {}, _animationReported {}, _skyReported {}, _waterReported {}, _footprintsReported {};
 	bool _debug {};
 	bool _profile {};
 };
