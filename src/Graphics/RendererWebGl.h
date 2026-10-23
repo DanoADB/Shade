@@ -442,7 +442,9 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
                 const auto& animation=index<context.instanceAnimations.size()?context.instanceAnimations[index]:restPose;
                 const auto time=animation.started<0 ? desc.time+animation.phase : uint32_t(std::max<int64_t>(0,
                     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()-animation.started));
-                DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),animation.clip,time,instances.morphWithTerrain);
+                if(Locator::config::value().hidePlayerHand&&key.meshId==browser::droughtCreatureMesh){
+                    const auto& pose=browser::SampleDroughtCreature();DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),AnimId::Invalid,time,false,nullptr,255,false,pose.data(),pose.size());
+                }else DrawObject(*mesh,context.instanceUniforms.at(instances.offset+i),animation.clip,time,instances.morphWithTerrain);
             }
         }
         if(desc.drawVegetation) for(const auto& [id,instances]:context.treeInstancedDrawDescs) {

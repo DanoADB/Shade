@@ -14,7 +14,7 @@ The default browser engine launch now starts Shade's three-minute drought scenar
 
 Three original villagers work autonomously as water gatherer, farmer and forester. They complete work cycles that affect scenario resources and reprioritize when a resource becomes scarce. Their original models move across terrain and use original villager walking clips; water deliveries trigger gratitude animations. Villagers credit the creature in the scenario's event history.
 
-The original C_Cow_Boned model (48 bones) is used, with an original bucket during water-carrying trips. Creature locomotion currently uses ground-following translation, turning and body motion; dedicated creature skeletal walk/work animation is not implemented. Worker paths are simple terrain-following routes, not full settlement navigation. Water, crops, forest, faith and learning are slice-level simulation values, not a replacement for native OpenBlack's economy/AI. The channel and spring are functional scenario states; there is no excavated terrain mesh or fluid simulation yet.
+Original Cow (48 bones), Rhino (48) and Sheep (48) models now have matching CBN skeletal animation banks. The Their god selector changes model and motion bank while preserving the current village, time, action and learned preferences. An original bucket appears during water-carrying trips. Worker paths are simple terrain-following routes, not full settlement navigation. Water, crops, forest, faith and learning are slice-level simulation values, not a replacement for native OpenBlack's economy/AI. The channel and spring are functional scenario states; there is no excavated terrain mesh or fluid simulation yet.
 
 ## Presentation
 
@@ -33,4 +33,12 @@ The slice adds responsive woodland-and-brass UI, a new landing page, warmer terr
 
 The scenario now has an original-art old well, a ground-following pool, an upstream pool revealed by exploration, and a progressively built earth-and-water channel. Completed watercourses show moving flow highlights. These are surface meshes; terrain excavation and fluid physics remain outside this slice. Villagers carry original buckets, food or wood props on their return trips. Inspectable scene labels show water sites and workers and can move the camera to them. Anchors remain current while the scenario is paused. Restart clears generated props and surface geometry.
 
-The standalone drought geometry check covers discovery visibility, partial/completed construction, terrain fit, out-of-range progress and duplicate path points. Model/UI regressions passed. Browser startup rendered 144 surface vertices with GL error zero and displayed the original well and inspectable labels without new console errors. Original creature skeletal animation work is the next active batch.
+The standalone drought geometry check covers discovery visibility, partial/completed construction, terrain fit, out-of-range progress and duplicate path points. Model/UI regressions passed. Browser startup rendered 144 surface vertices with GL error zero and displayed the original well and inspectable labels without new console errors. Original creature skeletal animation and god selection are now implemented; see the checkpoint below.
+
+## Creature motion and god selection
+
+Cow, Rhino and Sheep load their own original animation banks (160, 160 and 160 unique named clips). Eleven action clips cover standing, walking, drinking, channel work, sleep/wake, rain casting and celebration. Sparse channels use quaternion interpolation, short transitions and in-place root travel; gait follows distance travelled. Ground contact correction offsets the whole animated body; it is not per-foot terrain IK. All gods are normalized to an eleven-metre standing height for scenario presentation. The bucket still needs a bone attachment.
+
+Use **Their god** to swap while active or paused, and **Follow creature** to keep it framed. Switching does not reset village resources, workers, scenario time or learning; failure leaves the previous selection active. Begin again retains the chosen god but resets the scenario. Reload does not yet preserve either the run or choice. Species currently share scenario rules and do not have separate personalities or balance.
+
+Synthetic animation tests and original-asset sampling cover all three rigs. Browser standing poses and live swaps were checked; not every action on every rig has received visual acceptance. See [the functionality audit](FUNCTIONALITY_AUDIT.md) for evidence, limits and ordered development gates.
