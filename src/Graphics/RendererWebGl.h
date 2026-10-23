@@ -320,6 +320,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         renderer->_spriteProgram=CompileProgram(spriteVertex,spriteFragment);
         if (!renderer->_program || !renderer->_objectProgram || !renderer->_skyProgram || !renderer->_waterProgram || !renderer->_footprintProgram || !renderer->_lineProgram || !renderer->_spriteProgram) return nullptr;
         glGenVertexArrays(1,&renderer->_vao);
+        glGenBuffers(1,&renderer->_surfaceBuffer);
         glGenFramebuffers(1,&renderer->_framebuffer);
         glGetIntegerv(GL_MAX_TEXTURE_SIZE,&renderer->_maxBoneHeight);
         const glm::mat4 identity(1);
@@ -341,6 +342,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
         if (_lineProgram)glDeleteProgram(_lineProgram);
         if (_spriteProgram)glDeleteProgram(_spriteProgram);
         if (_spriteBuffer)glDeleteBuffers(1,&_spriteBuffer);
+        if (_surfaceBuffer)glDeleteBuffers(1,&_surfaceBuffer);
         if (_boneTexture)glDeleteTextures(1,&_boneTexture);
         if (_framebuffer)glDeleteFramebuffers(1,&_framebuffer);
         if (_vao) glDeleteVertexArrays(1,&_vao);
@@ -458,6 +460,7 @@ void main(){outputColor=texture(diffuse,uv).rrrr*tint;}
             if(desc.drawFootpaths)DrawLines(context.footpaths.get(),matrix,glm::mat4(1));
             if(desc.drawStreams)DrawLines(context.streams.get(),matrix,glm::mat4(1));
         }
+        if(Locator::config::value().hidePlayerHand)DrawWaterworks(matrix);
         if(desc.drawSprites)DrawSprites(desc);
         glDepthMask(GL_TRUE);glDisable(GL_BLEND);
         glBindVertexArray(0);
@@ -676,6 +679,19 @@ private:
         if(mesh->IsIndexed()){const auto& indices=mesh->GetIndexBuffer();glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indices.handle.id);glDrawElements(GL_LINES,indices.count,indices.type==IndexBuffer::Type::Uint16?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT,nullptr);}
         else glDrawArrays(GL_LINES,0,vertices.vertexCount);
     }
+    void DrawWaterworks(const glm::mat4& matrix) const noexcept {
+        const auto& vertices=browser::droughtGround;if(vertices.empty())return;
+        glUseProgram(_lineProgram);glBindBuffer(GL_ARRAY_BUFFER,_surfaceBuffer);
+        if(_surfaceRevision!=browser::droughtGroundRevision){glBufferData(GL_ARRAY_BUFFER,vertices.size()*sizeof(browser::GroundVertex),vertices.data(),GL_DYNAMIC_DRAW);_surfaceRevision=browser::droughtGroundRevision;}
+        glUniformMatrix4fv(glGetUniformLocation(_lineProgram,"viewProjection"),1,GL_FALSE,glm::value_ptr(matrix));
+        const glm::mat4 identity(1);glUniformMatrix4fv(glGetUniformLocation(_lineProgram,"model"),1,GL_FALSE,glm::value_ptr(identity));
+        for(GLuint i=2;i<7;++i)glDisableVertexAttribArray(i);
+        glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(browser::GroundVertex),nullptr);
+        glEnableVertexAttribArray(1);glVertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,sizeof(browser::GroundVertex),reinterpret_cast<void*>(offsetof(browser::GroundVertex,color)));
+        glDisable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);glDepthMask(GL_FALSE);glEnable(GL_BLEND);glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+        glDrawArrays(GL_TRIANGLES,0,vertices.size());
+        if(!_surfacesReported){emscripten_log(EM_LOG_CONSOLE,"Drought ground surfaces: %zu vertices; GL error 0x%x",vertices.size(),glGetError());_surfacesReported=true;}
+    }
     void DrawSprites(const DrawSceneDesc& desc) const noexcept {
         glUseProgram(_spriteProgram);glDepthMask(GL_FALSE);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE);
         const auto projection=desc.camera->GetViewProjectionMatrix(Camera::Projection::Normal);
@@ -873,6 +889,9 @@ private:
     }
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE _context {};
     GLuint _program {}, _objectProgram {}, _skyProgram {}, _waterProgram {}, _footprintProgram {}, _lineProgram {}, _spriteProgram {}, _spriteBuffer {}, _vao {}, _framebuffer {};
+    GLuint _surfaceBuffer{};
+    mutable unsigned _surfaceRevision{std::numeric_limits<unsigned>::max()};
+    mutable bool _surfacesReported{};
     bool _compressedTextures{};
     size_t _compressedCount{},_decodedCount{},_compressedBytes{},_decodedEquivalentBytes{};
     size_t _singleChannelCount{},_singleChannelBytes{};

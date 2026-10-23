@@ -1,5 +1,5 @@
 {
-  "source_revision": "9b5f2ade524265ff0eb768c17c58474fd1ae6a95",
+  "source_revision": "d129ad861f58465d8d858b0954e14cfbdbfacca5",
   "engine": "openblack-webgl2",
   "original_assets_bundled": true,
   "files": {
@@ -8,12 +8,12 @@
       "sha256": "c0edaae2e785d794253a0d44184909e01eafdbc853a04663ae9a2f6eb4b75f53"
     },
     "openblack.js": {
-      "bytes": 279009,
-      "sha256": "ff00f07a9a8f9054d9fff0891eaf733550667e7920b89952fdfca28994213eb7"
+      "bytes": 279826,
+      "sha256": "eb00ac273ec29347f2780e6e80627f3797660b361d06ce48cd70d436f63213ae"
     },
     "openblack.wasm": {
-      "bytes": 3874905,
-      "sha256": "d4d0994a759290eeb0c6b59abe0dc80b08244207dfe995159fc07d735b30097a"
+      "bytes": 3896957,
+      "sha256": "a34239f3d22d579acba5f12fdb0b7b6342bb0eddea50cdccd94583e179d56909"
     },
     "mobile-controls.js": {
       "bytes": 4295,
@@ -28,8 +28,8 @@
       "sha256": "d2804a63e10d179a14c7de70e2338e07aa13d09f5b1f1d9950f2735a58200804"
     },
     "drought.js": {
-      "bytes": 10417,
-      "sha256": "884579f2dd2786c5f48e24d976c394490d9eebebda22255bb3f9d98d8bc73415"
+      "bytes": 11769,
+      "sha256": "5ae6443838cdb1917d349aa4644f45fd382f45d9b6336c9ecd80cb424f0213d5"
     }
   }
 }
