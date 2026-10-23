@@ -345,16 +345,25 @@ bool Game::Update() noexcept
 	// Input events
 	{
 		auto sdlInput = profiler.BeginScoped(Profiler::Stage::SdlInput);
+#ifdef __EMSCRIPTEN__
+        // Clear transient input even when a native menu owns the pointer.
+        Locator::gameActionSystem::value().Frame();
+#else
 		if (!Locator::debugGui::value().StealsFocus())
 		{
 			Locator::gameActionSystem::value().Frame();
 		}
+#endif
 		SDL_Event e;
 		while (SDL_PollEvent(&e) != 0)
 		{
 			Locator::events::value().Create<SDL_Event>(e);
 		}
+#ifdef __EMSCRIPTEN__
+        if(!Locator::debugGui::value().StealsFocus())camera.HandleActions(deltaTime);
+#else
 		camera.HandleActions(deltaTime);
+#endif
 	}
 
 	if (!config.running)
@@ -371,7 +380,11 @@ bool Game::Update() noexcept
 		}
 	}
 
+#ifdef __EMSCRIPTEN__
+    if(!Locator::debugGui::value().StealsFocus())camera.Update(deltaTime);
+#else
 	camera.Update(deltaTime);
+#endif
 	Locator::cameraBookmarkSystem::value().Update(deltaTime);
 
 	// Update Game Logic in Registry

@@ -11,6 +11,7 @@
 #define LOCATOR_IMPLEMENTATIONS
 
 #include <cmath>
+#include <unordered_set>
 
 #include <SDL3/SDL.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -172,6 +173,49 @@ bool Gui::ProcessEvents(const SDL_Event& event) noexcept
 	ImGui_ImplSDL3_ProcessEvent(&event);
 
 	const auto& io = ImGui::GetIO();
+#ifdef __EMSCRIPTEN__
+    // Browser pointer events can enter and click a menu within one engine frame.
+    // Predict ownership from the current event position, not last frame's IO flag.
+    auto capturesPoint=[](float x,float y){
+        ImGuiWindow* hovered=nullptr;ImGuiWindow* underMoving=nullptr;
+        ImGui::FindHoveredWindowEx(ImVec2(x,y),false,&hovered,&underMoving);
+        return hovered!=nullptr || ImGui::GetCurrentContext()->OpenPopupStack.Size>0;
+    };
+    static uint32_t capturedButtons=0;
+    static std::unordered_set<SDL_FingerID> capturedFingers;
+    if(event.type==SDL_EVENT_FINGER_DOWN || event.type==SDL_EVENT_FINGER_UP || event.type==SDL_EVENT_FINGER_MOTION || event.type==SDL_EVENT_FINGER_CANCELED){
+        const auto& finger=event.tfinger;
+        if(event.type==SDL_EVENT_FINGER_DOWN){
+            const auto size=Locator::windowing::value().GetSize();
+            _stealsFocus=capturesPoint(finger.x*size.x,finger.y*size.y);
+            if(_stealsFocus){capturedFingers.insert(finger.fingerID);}
+        }else{
+            _stealsFocus=capturedFingers.contains(finger.fingerID);
+            if(event.type!=SDL_EVENT_FINGER_MOTION)capturedFingers.erase(finger.fingerID);
+        }
+        return _stealsFocus;
+    }
+    if(event.type==SDL_EVENT_MOUSE_BUTTON_DOWN || event.type==SDL_EVENT_MOUSE_BUTTON_UP){
+        if(!event.button.windowID){_stealsFocus=false;return false;}
+        const uint32_t bit=1u<<std::min<unsigned>(event.button.button,31);
+        if(event.type==SDL_EVENT_MOUSE_BUTTON_DOWN){
+            capturedButtons&=~bit;
+            _stealsFocus=capturesPoint(event.button.x,event.button.y);
+            if(_stealsFocus)capturedButtons|=bit;
+        }else{_stealsFocus=(capturedButtons&bit)!=0;capturedButtons&=~bit;}
+        return _stealsFocus;
+    }
+    if(event.type==SDL_EVENT_MOUSE_MOTION){
+        if(!event.motion.windowID){_stealsFocus=false;return false;}
+        _stealsFocus=capturedButtons!=0 || (!event.motion.state && capturesPoint(event.motion.x,event.motion.y));
+        return _stealsFocus;
+    }
+    if(event.type==SDL_EVENT_MOUSE_WHEEL){
+        if(!event.wheel.windowID){_stealsFocus=false;return false;} // HTML camera controls deliberately target the engine.
+        float x=0,y=0;SDL_GetMouseState(&x,&y);_stealsFocus=capturesPoint(x,y);return _stealsFocus;
+    }
+    if((event.type==SDL_EVENT_KEY_DOWN || event.type==SDL_EVENT_KEY_UP) && !event.key.windowID){_stealsFocus=false;return false;}
+#endif
 	_stealsFocus = io.WantCaptureMouse;
 	switch (event.type)
 	{
