@@ -46,3 +46,8 @@ Priority describes the next playable Shade milestone, not the amount of unfinish
 - `web/tests/drought-model.test.cjs` and `drought-ui.test.cjs`: timing, learning, outcomes, workers, pause, suspension, follow and swap UI failure rollback. These are not substitutes for terrain collision, visual quality or actual-device tests.
 
 The first playable loop already exists. The next goal is to make it durable and physically convincing before expanding toward campaign breadth.
+
+
+### Browser villager carrying update
+
+The drought scene now carries whole villagers with Ctrl + left mouse. Placement validates terrain and obstacles, replans the three scenario workers, and prevents resource rewards while carried. Returning or cancelling restores the pickup position. This closes the basic villager interaction gap; persistent moved positions, dedicated carry animation, throwing and impact reactions remain open. Next priority: extend save/resume to physical village changes and ground resource piles.

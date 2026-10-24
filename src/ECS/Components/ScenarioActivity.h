@@ -1,2 +1,2 @@
 #pragma once
-namespace openblack::ecs::components { struct ScenarioActivity { bool moving; }; }
+namespace openblack::ecs::components { struct HandCarried {}; struct ScenarioActivity { bool moving; }; }

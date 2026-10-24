@@ -3,6 +3,7 @@
 #include <cmath>
 #include <chrono>
 #include <vector>
+#include <memory>
 #include <array>
 #include "Windowing/WindowingInterface.h"
 #include <emscripten/emscripten.h>
@@ -91,7 +92,8 @@ class DroughtScene {
         godRoutes[1]=large.Find(safeHome,{spring.x,spring.z},24);
         if(!godRoutes[1].empty())spring=godRoutes[1].back();
         channelPath=godRoutes[1];std::reverse(channelPath.begin(),channelPath.end());
-        navigation::TerrainRoutes small(origin,161,2,{.65f,.65f},height,obstacles);
+        villagerNavigation=std::make_unique<navigation::TerrainRoutes>(origin,161,2,navigation::Profile{.65f,.65f},height,obstacles);
+        auto& small=*villagerNavigation;
         workerRoutes.resize(workers.size());routeMask=0;
         if(!godRoutes[0].empty())routeMask|=1;
         if(!godRoutes[1].empty())routeMask|=2|4;
@@ -134,7 +136,28 @@ class DroughtScene {
         return 1;
     }
 public:
-    int Routes()const{return routeMask;}
+    std::unique_ptr<navigation::TerrainRoutes> villagerNavigation;
+    int Routes()const{
+        int mask=routeMask;auto& registry=Locator::entitiesRegistry::value();
+        for(size_t i=0;i<workers.size();++i)if(registry.Valid(workers[i])&&registry.AllOf<ecs::components::HandCarried>(workers[i]))mask&=~(7<<(3+i*3));
+        return mask;
+    }
+    bool PlaceVillager(entt::entity entity,glm::vec3& position){
+        if(!villagerNavigation)return false;
+        glm::vec2 safe;if(!villagerNavigation->Nearest({position.x,position.z},safe,8))return false;
+        auto it=std::find(workers.begin(),workers.end(),entity);
+        if(it!=workers.end()){
+            const auto index=std::distance(workers.begin(),it);
+            std::array<std::vector<glm::vec3>,3> paths;
+            const std::array<glm::vec3,3> goals{well,home+glm::vec3(12,0,8),spring};int bits=0;
+            for(int j=0;j<3;++j){paths[j]=villagerNavigation->Find(safe,{goals[j].x,goals[j].z});if(!paths[j].empty())bits|=1<<(3+index*3+j);}
+            if(!bits)return false;
+            workerRoutes[index]=std::move(paths);workerHomes[index]=Ground({safe.x,0,safe.y});
+            routeMask=(routeMask&~(7<<(3+index*3)))|bits;
+            EM_ASM({if(Module.shadeDroughtWorkerMoved)Module.shadeDroughtWorkerMoved($0);},index);
+        }
+        position=Ground({safe.x,0,safe.y});return true;
+    }
     void RestoreCounters(int deliveries){lastDelivery=animationDeliveries=deliveries;happyUntil=wakeUntil=castUntil=0;}
     int SwapGod(int selection){
         auto& registry=Locator::entitiesRegistry::value();
@@ -190,6 +213,10 @@ public:
         using namespace ecs::components;
         if(index<0||size_t(index)>=workers.size())return;
         auto& registry=Locator::entitiesRegistry::value();auto e=workers[index];if(!registry.Valid(e))return;
+        if(registry.AllOf<HandCarried>(e)){
+            if(size_t(index)<workerProps.size()&&registry.Valid(workerProps[index]))registry.Get<Transform>(workerProps[index]).scale=glm::vec3(0);
+            return;
+        }
         auto destination=job==0?well:job==1?home+glm::vec3(12,0,8):spring;
         const auto t=std::clamp(progress,0.f,1.f);const auto travel=t<.4f?t/.4f:t>.6f?(1-t)/.4f:1;
         auto& transform=registry.Get<Transform>(e);auto next=Ground(navigation::Along(workerRoutes[index][std::clamp(job,0,2)],travel,workerHomes[index]));auto delta=next-transform.position;delta.y=0;
@@ -277,6 +304,7 @@ public:
 namespace openblack::browser {
 static DroughtScene& Scene(){static DroughtScene scene;return scene;}
 int DroughtRoutes(){return Scene().Routes();}
+bool PlaceDroughtVillager(entt::entity entity,glm::vec3& position){return Scene().PlaceVillager(entity,position);}
 int RunDrought(int phase,float progress,int deliveries,int focus,int reset){return Scene().Run(phase,progress,deliveries,focus,reset);}
 void RestoreDroughtCounters(int deliveries){Scene().RestoreCounters(deliveries);}
 int SwapDroughtGod(int selection){return Scene().SwapGod(selection);}

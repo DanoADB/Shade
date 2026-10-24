@@ -147,8 +147,9 @@ void RenderingSystem::PrepareDrawUploadUniforms(bool drawBoundingBox)
             if (const auto* villager = registry.TryGet<const Villager>(entity))
             {
                 const auto* scenario=registry.TryGet<ScenarioActivity>(entity);
-                const bool moving = (scenario && scenario->moving) || registry.AnyOf<MoveStateLinearTag, MoveStateOrbitTag, MoveStateExitCircleTag,
+                bool moving = (scenario && scenario->moving) || registry.AnyOf<MoveStateLinearTag, MoveStateOrbitTag, MoveStateExitCircleTag,
                                                    MoveStateStepThroughTag>(entity);
+                if(registry.AllOf<HandCarried>(entity))moving=false;
                 const auto walk = villager->sex == Villager::Sex::FEMALE ? AnimId::PWalkWoman : AnimId::PWalkMan;
                 _renderContext.instanceAnimations[idx] = {moving ? walk : AnimId::PStand,
                     static_cast<uint32_t>(entity) * 137u};

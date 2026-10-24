@@ -24,6 +24,7 @@
 #include "ECS/Components/Field.h"
 #include "ECS/Components/Fixed.h"
 #include "ECS/Components/Transform.h"
+#include "ECS/Components/ScenarioActivity.h"
 #include "ECS/Components/WallHug.h"
 #include "ECS/Map.h"
 #include "ECS/Registry.h"
@@ -383,7 +384,8 @@ template <MoveState S, typename... Exclude>
 void ApplyStepGoal(ecs::Registry& registry, Exclude... exclude)
 {
 	registry.Each<const MoveStateTagComponent<S>, Transform>(
-	    [](const MoveStateTagComponent<S>& state, Transform& transform) {
+	    [](entt::entity entity, const MoveStateTagComponent<S>& state, Transform& transform) {
+            if(Locator::entitiesRegistry::value().AllOf<HandCarried>(entity))return;
 		    const float altitude = Locator::terrainSystem::value().GetHeightAt(state.stepGoal);
 		    transform.position = glm::xzy(glm::vec3(state.stepGoal, altitude));
 	    },

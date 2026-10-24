@@ -9,6 +9,8 @@
 #include <vector>
 #include <emscripten/emscripten.h>
 #include "Camera/Camera.h"
+#include "BrowserDrought.h"
+#include "ECS/Components/ScenarioActivity.h"
 #include "ECS/Registry.h"
 #include "ECS/Components/Abode.h"
 #include "ECS/Components/Fixed.h"
@@ -30,6 +32,8 @@ using namespace ecs::components;
 class Gameplay
 {
     entt::entity selected{entt::null}, bundle{entt::null}, source{entt::null};
+    entt::entity heldVillager{entt::null};
+    glm::vec3 pickupPosition{};
     struct Dropped {bool food;entt::entity source;};
     std::map<entt::entity,Dropped> dropped;
     std::unordered_set<uint32_t> gathered;
@@ -195,8 +199,19 @@ public:
         for(const auto entity:expired)registry.Remove<PlayerGiftReaction>(entity);
         if(bundle!=entt::null && !registry.Valid(bundle)){bundle=entt::null;source=entt::null;}
         for(auto it=dropped.begin();it!=dropped.end();)if(!registry.Valid(it->first))it=dropped.erase(it);else ++it;
+        if(heldVillager!=entt::null&&!registry.Valid(heldVillager))heldVillager=entt::null;
+        if(heldVillager!=entt::null&&(action==7||action==10)){
+            auto position=pickupPosition;bool placed=false;
+            if(action==10&&std::isfinite(x)&&std::isfinite(y)&&x>=0&&x<=1&&y>=0&&y<=1){
+                auto hit=Locator::camera::value().RaycastScreenCoordToLand({x,y},false);
+                if(hit){position=hit->position;placed=PlaceDroughtVillager(heldVillager,position);}
+            }
+            registry.Get<Transform>(heldVillager).position=placed?position:pickupPosition;
+            registry.Remove<HandCarried>(heldVillager);heldVillager=entt::null;registry.SetDirty();
+            message=placed?"Villager placed safely. Work resumes from the new location.":"Villager returned safely to the pickup spot.";action=0;
+        }
         if(action==11){
-            if(bundle!=entt::null){message="Release or return the held resource first.";action=0;}
+            if(bundle!=entt::null||heldVillager!=entt::null){message="Release or return what you are holding first.";action=0;}
             else{Select(x,y);if(Kind(selected)==5){auto item=dropped.at(selected);bundle=selected;source=item.source;carryingFood=item.food;dropped.erase(selected);message=carryingFood?"Holding food. Release Ctrl or the left mouse button to drop.":"Holding wood. Release Ctrl or the left mouse button to drop.";action=0;}else action=2;}
         }
         if(action==10&&bundle!=entt::null){
@@ -223,7 +238,13 @@ public:
         }
         if(action==2)
         {
-            if(bundle!=entt::null)message="Deliver or return the resource in your hand first.";
+            if(bundle!=entt::null||heldVillager!=entt::null)message="Release what you are holding first.";
+            else if(Kind(selected)==3&&Locator::config::value().shadeDroughtScene){
+                heldVillager=selected;pickupPosition=registry.Get<Transform>(selected).position;
+                registry.AssignOrReplace<HandCarried>(selected);
+                registry.Remove<PlayerGiftReaction>(selected);
+                message="Holding villager. Release Ctrl or the left mouse button to place safely.";
+            }
             else if(Kind(selected)!=1 && Kind(selected)!=4)message="Select a tree for wood or a field for food.";
             else if((Kind(selected)==1?gathered:harvested).contains(uint32_t(selected)))message="This source has already supplied a bundle.";
             else
@@ -289,6 +310,10 @@ public:
             const auto hands=Locator::handSystem::value().GetPlayerHandPositions();
             if(hands[0]){registry.Get<Transform>(bundle).position=*hands[0]+glm::vec3(0,0.5f,0);registry.SetDirty();}
         }
+        if(heldVillager!=entt::null&&Locator::handSystem::has_value()){
+            const auto hands=Locator::handSystem::value().GetPlayerHandPositions();
+            if(hands[0]){registry.Get<Transform>(heldVillager).position=*hands[0]+glm::vec3(0,.5f,0);registry.SetDirty();}
+        }
         const int kind=Kind(selected);
         unsigned wood=0,food=0,people=0,health=0,hunger=0;
         if(kind==2||kind==4){const auto& abode=registry.Get<Abode>(selected);wood=abode.woodAmount;food=abode.foodAmount;people=abode.inhabitants.size();}
@@ -297,8 +322,8 @@ public:
         const auto size=Locator::windowing::value().GetSize();
         if(kind && !Locator::camera::value().ProjectWorldToScreen(Anchor(selected),{0,0,size.x,size.y},marker))marker=glm::vec3(-1);
         EM_ASM({if(Module.shadeGameplayUpdate)Module.shadeGameplayUpdate({kind:$0,carrying:!!$1,delivered:$2,wood:$3,food:$4,people:$5,health:$6,hunger:$7,
-            gathered:!!$8,message:UTF8ToString($9),x:$10,y:$11,response:!!$12,foodHeld:!!$13,fed:$14});},kind,bundle!=entt::null,delivered,wood,food,people,health,hunger,
-            (kind==1 && gathered.contains(uint32_t(selected)))||(kind==4 && harvested.contains(uint32_t(selected))),message,marker.x/size.x,marker.y/size.y,Kind(responder)==3,carryingFood,fed);
+            gathered:!!$8,message:UTF8ToString($9),x:$10,y:$11,response:!!$12,foodHeld:!!$13,fed:$14,personHeld:!!$15});},kind,bundle!=entt::null||heldVillager!=entt::null,delivered,wood,food,people,health,hunger,
+            (kind==1 && gathered.contains(uint32_t(selected)))||(kind==4 && harvested.contains(uint32_t(selected))),message,marker.x/size.x,marker.y/size.y,Kind(responder)==3,carryingFood,fed,heldVillager!=entt::null);
     }
 };
 }

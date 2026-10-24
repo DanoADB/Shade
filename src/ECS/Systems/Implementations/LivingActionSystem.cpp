@@ -21,6 +21,7 @@
 #include "Common/RandomNumberManager.h"
 #include "ECS/Components/LivingAction.h"
 #include "ECS/Components/Transform.h"
+#include "ECS/Components/ScenarioActivity.h"
 #include "ECS/Components/Villager.h"
 #include "ECS/Components/WallHug.h"
 #include "ECS/Registry.h"
@@ -477,24 +478,24 @@ void LivingActionSystem::Update()
 {
 	auto& registry = Locator::entitiesRegistry::value();
 
-	registry.Each<LivingAction>([](LivingAction& action) { ++action.turnsSinceStateChange; });
+	registry.Each<LivingAction>([](LivingAction& action) { ++action.turnsSinceStateChange; },entt::exclude<HandCarried>);
 
 	// TODO(#475): process food speedup
 
 	registry.Each<const Villager, LivingAction>([this]([[maybe_unused]] const Villager& villager, LivingAction& action) {
 		VillagerCallValidate(action, LivingAction::Index::Top);
-	});
+	},entt::exclude<HandCarried>);
 	// TODO(#476): same call but for other types of living
 
 	registry.Each<const Villager, LivingAction>([this]([[maybe_unused]] const Villager& villager, LivingAction& action) {
 		VillagerCallValidate(action, LivingAction::Index::Final);
-	});
+	},entt::exclude<HandCarried>);
 	// TODO(#476): same call but for other types of living
 
 	// TODO(bwrsandman): Store result of this call in vector or with tag component
 	registry.Each<const Villager, LivingAction>([this]([[maybe_unused]] const Villager& villager, LivingAction& action) {
 		VillagerCallState(action, LivingAction::Index::Top);
-	});
+	},entt::exclude<HandCarried>);
 	// TODO(#476): same call but for other types of living
 }
 

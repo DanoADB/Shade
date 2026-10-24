@@ -76,3 +76,12 @@ Browser acceptance: the original orange hand follows a click onto terrain; wood 
 On desktop, hold Ctrl and press the left mouse button over a tree or field to immediately pick up wood or food. Move the pointer while holding the chord; release either Ctrl or the left button to release the bundle. Releasing over a building delivers it; food released over a hungry villager feeds them. Otherwise the resource is placed at the terrain ray intersection and can be picked up again with the same chord. Escape, blur, hidden-page and cancelled-pointer events return held resources safely. Camera dragging and Ctrl zoom are suppressed for this gesture in the drought scenario; native comparison controls stay unchanged. The existing Hand tools buttons remain available for touch users. Dropped bundles are session objects and are not part of the drought checkpoint.
 
 Ctrl-grab acceptance: browser Ctrl-click on a tree created and released a wood bundle; repeating the gesture picked up and released that dropped bundle. The same gesture on a field released a food offering at the pointer. UI tests cover modifier-first release, pointer-first release, single delivery of the release event, focus loss, Escape and cancellation. Native and WASM builds passed.
+
+
+### Whole-villager pickup
+
+In the drought scene, hold Ctrl + left mouse on a villager to carry the existing villager. Release either to place them. Hand tools also offers Find villager, Pick up villager and Return held object. Escape, focus loss, leaving the scene and restarting return carried villagers to their pickup position.
+
+Placement snaps within eight world units to clear, dry terrain using the same slope and obstacle clearance as worker navigation. A moved worker needs at least one reachable job. Invalid placement returns the villager safely. Carried workers pause progress and rewards, hide their work prop, and use the idle pose. Placed workers rebuild their routes and start a fresh trip without receiving a completion reward for the abandoned trip; cancellation preserves the interrupted trip.
+
+Moved villagers and dropped resources are session-only. The current save schema still restores the original village positions on reload. Persisting physical village changes is the next milestone. Carry poses, throwing and impact damage are not implemented.

@@ -21,3 +21,12 @@ blocked.step(1,noRoutes);assert.equal(blocked.deliveries,0);assert.equal(blocked
 blocked.phase='idle';blocked.elapsed=0;blocked.duration=3;blocked.step(3,noRoutes);assert.equal(blocked.phase,'rest','Choose a reachable activity instead of walking through a blocked route');
 const reassigned=new Drought();reassigned.step(.25,{workers:[{'hauling water':false,'tending crops':true}]});assert.equal(reassigned.workers[0].job,'tending crops');assert(reassigned.workers[0].progress>0);
 console.log('Unreachable trips pause without rewards; idle actors choose safe alternative work.');
+
+const carried=new Drought();carried.phase='rest';carried.duration=1000;carried.workers[0].progress=.99;
+const beforeCycles=carried.workers[0].cycles;
+carried.step(4,{workers:[{'hauling water':false,'tending crops':false,'protecting trees':false}]});
+assert.equal(carried.workers[0].progress,.99);assert.equal(carried.workers[0].cycles,beforeCycles,'Carrying cannot complete a delivery');
+carried.workers[0].progress=0;carried.step(.25);
+assert.equal(carried.workers[0].cycles,beforeCycles,'Relocation starts a new trip without awarding the abandoned trip');
+assert(carried.workers[0].progress>0&&carried.workers[0].progress<.1);
+console.log('Carried workers freeze; safe relocation restarts work without a delivery bonus.');
