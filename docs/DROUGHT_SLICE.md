@@ -85,3 +85,8 @@ In the drought scene, hold Ctrl + left mouse on a villager to carry the existing
 Placement snaps within eight world units to clear, dry terrain using the same slope and obstacle clearance as worker navigation. A moved worker needs at least one reachable job. Invalid placement returns the villager safely. Carried workers pause progress and rewards, hide their work prop, and use the idle pose. Placed workers rebuild their routes and start a fresh trip without receiving a completion reward for the abandoned trip; cancellation preserves the interrupted trip.
 
 Moved villagers and dropped resources are session-only. The current save schema still restores the original village positions on reload. Persisting physical village changes is the next milestone. Carry poses, throwing and impact damage are not implemented.
+
+
+### Held-object tracking correction
+
+Shade's Ctrl + left-mouse grab now bypasses the engine's normal left-button hand-position lock. Camera drags retain their original locking behavior. Held villagers and resource bundles update after the hand raycast on every rendered frame, with a visible offset above the palm, instead of waiting for the 100 ms gameplay tick.

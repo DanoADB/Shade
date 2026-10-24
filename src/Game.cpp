@@ -8,6 +8,10 @@
  *******************************************************************************/
 
 #include "Game.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#include "BrowserDrought.h"
+#endif
 
 #include <string>
 
@@ -405,7 +409,11 @@ bool Game::Update() noexcept
 	{
 		auto profilerScopedUpdateUniforms = profiler.BeginScoped(Profiler::Stage::UpdateUniforms);
 
-		if (!_handGripping)
+		bool browserGrab=false;
+#ifdef __EMSCRIPTEN__
+        browserGrab=config.shadeDroughtScene&&EM_ASM_INT({return !!Module.shadePointerGrab;});
+#endif
+        if (!_handGripping || browserGrab)
 		{
 			if (const auto intersection = camera.RaycastMouseToLand(true))
 			{
@@ -422,6 +430,9 @@ bool Game::Update() noexcept
 			}
 		}
 		Locator::handSystem::value().Update();
+#ifdef __EMSCRIPTEN__
+        if(config.shadeDroughtScene)browser::UpdateBrowserHeldObjects();
+#endif
 
 		// Update Entities
 		{

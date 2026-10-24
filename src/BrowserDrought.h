@@ -15,6 +15,7 @@ void AnimateDroughtCreature(int phase,float progress,float time,int paused,int d
 const std::vector<glm::mat4>& SampleDroughtCreature();
 void UpdateDroughtWorld(int discovered,int channel,float progress,float time);
 int DroughtRoutes();
+void UpdateBrowserHeldObjects();
 bool PlaceDroughtVillager(entt::entity entity,glm::vec3& position);
 int RunDrought(int phase,float progress,int deliveries,int focus,int reset);
 void RunDroughtWorker(int index,int job,float progress);

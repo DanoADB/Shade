@@ -318,6 +318,7 @@ static openblack::browser::Gameplay& BrowserGameplay()
     static openblack::browser::Gameplay gameplay;
     return gameplay;
 }
+void openblack::browser::UpdateBrowserHeldObjects(){BrowserGameplay().UpdateHeld();}
 extern "C" EMSCRIPTEN_KEEPALIVE void shade_gameplay(int action,float x,float y)
 {
     if(action==1 && openblack::Locator::debugGui::has_value() && openblack::Locator::debugGui::value().StealsFocus())return;

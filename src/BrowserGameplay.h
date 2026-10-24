@@ -131,6 +131,20 @@ class Gameplay
         message=Kind(selected) ? "Object selected." : "No object here. Tap a tree, villager or building, or use Find.";
     }
 public:
+    // Called after the hand raycast each rendered frame, not just the rules tick.
+    void UpdateHeld()
+    {
+        if(!Locator::entitiesRegistry::has_value()||!Locator::handSystem::has_value())return;
+        auto& registry=Locator::entitiesRegistry::value();
+        const auto hands=Locator::handSystem::value().GetPlayerHandPositions();
+        if(!hands[0])return;
+        const auto held=bundle!=entt::null?bundle:heldVillager;
+        if(held!=entt::null&&registry.Valid(held)){
+            // Keep the payload above the hand mesh rather than buried inside its palm.
+            registry.Get<Transform>(held).position=*hands[0]+glm::vec3(0,2.f,0);
+            registry.SetDirty();
+        }
+    }
     void Save()
     {
         const auto& registry=Locator::entitiesRegistry::value();
@@ -305,15 +319,7 @@ public:
             (carryingFood?harvested:gathered).erase(uint32_t(source));registry.Destroy(bundle);bundle=entt::null;source=entt::null;
             message="Resource returned to its source. Nothing was delivered.";
         }
-        if(bundle!=entt::null && Locator::handSystem::has_value())
-        {
-            const auto hands=Locator::handSystem::value().GetPlayerHandPositions();
-            if(hands[0]){registry.Get<Transform>(bundle).position=*hands[0]+glm::vec3(0,0.5f,0);registry.SetDirty();}
-        }
-        if(heldVillager!=entt::null&&Locator::handSystem::has_value()){
-            const auto hands=Locator::handSystem::value().GetPlayerHandPositions();
-            if(hands[0]){registry.Get<Transform>(heldVillager).position=*hands[0]+glm::vec3(0,.5f,0);registry.SetDirty();}
-        }
+        UpdateHeld();
         const int kind=Kind(selected);
         unsigned wood=0,food=0,people=0,health=0,hunger=0;
         if(kind==2||kind==4){const auto& abode=registry.Get<Abode>(selected);wood=abode.woodAmount;food=abode.foodAmount;people=abode.inhabitants.size();}
